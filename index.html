@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Friend - 英语好朋友</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- 火山云 RTC SDK -->
+    <script src="https://sf1-cdn-tos.volccdn.com/obj/volcfe/ve-rtc/1.6.2/ve-rtc.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 角色选择界面 -->
+        <div id="character-select" class="screen active">
+            <h1>👋 选一个好朋友吧！</h1>
+            <p class="subtitle">Choose a friend to talk with!</p>
+            <div class="character-grid">
+                <div class="character-card" data-char="emma">
+                    <div class="avatar">👩‍🏫</div>
+                    <h3>Miss Emma</h3>
+                    <p>温柔的老师</p>
+                </div>
+                <div class="character-card" data-char="tommy">
+                    <div class="avatar">👦</div>
+                    <h3>Tommy</h3>
+                    <p>你的好朋友</p>
+                </div>
+                <div class="character-card" data-char="lily">
+                    <div class="avatar">👧</div>
+                    <h3>Lily</h3>
+                    <p>活泼的姐姐</p>
+                </div>
+                <div class="character-card" data-char="mike">
+                    <div class="avatar">👨‍🦱</div>
+                    <h3>Coach Mike</h3>
+                    <p>运动教练</p>
+                </div>
+                <div class="character-card" data-char="rose">
+                    <div class="avatar">👵</div>
+                    <h3>Grandma Rose</h3>
+                    <p>慈祥的奶奶</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景选择界面 -->
+        <div id="scene-select" class="screen">
+            <h1>🎪 想去哪里玩？</h1>
+            <p class="subtitle">Where do you want to go?</p>
+            <div class="scene-grid">
+                <div class="scene-card" data-scene="zoo">
+                    <div class="scene-icon">🦁</div>
+                    <h3>魔法动物园</h3>
+                    <p>Magic Zoo</p>
+                </div>
+                <div class="scene-card" data-scene="market">
+                    <div class="scene-icon">🛒</div>
+                    <h3>欢乐超市</h3>
+                    <p>Super Market</p>
+                </div>
+                <div class="scene-card" data-scene="home">
+                    <div class="scene-icon">🏠</div>
+                    <h3>温馨小家</h3>
+                    <p>My Home</p>
+                </div>
+                <div class="scene-card" data-scene="park">
+                    <div class="scene-icon">🌳</div>
+                    <h3>快乐公园</h3>
+                    <p>Happy Park</p>
+                </div>
+            </div>
+            <button class="back-btn" onclick="showScreen('character-select')">← 换个朋友</button>
+        </div>
+
+        <!-- 画布聊天界面 -->
+        <div id="canvas-screen" class="screen">
+            <div class="canvas-header">
+                <button class="back-btn-small" onclick="showScreen('scene-select')">←</button>
+                <div class="character-display">
+                    <span id="current-avatar">👩‍🏫</span>
+                    <span id="current-char-name">Miss Emma</span>
+                </div>
+                <button class="settings-btn" onclick="toggleSettings()">⚙️</button>
+            </div>
+            
+            <!-- 主画布 -->
+            <div class="canvas-container" id="canvas">
+                <!-- 背景层 -->
+                <div class="canvas-background" id="canvas-bg"></div>
+                
+                <!-- ⭐ RTC 视频层（数字人视频） -->
+                <div class="rtc-video-layer" id="rtc-video-layer">
+                    <div class="video-container" id="avatar-video-container">
+                        <!-- 火山 RTC 视频将播放在这里 -->
+                    </div>
+                    <button class="toggle-video-btn" onclick="toggleVideoMode()">
+                        📹 切换动画模式
+                    </button>
+                </div>
+                
+                <!-- 角色层 -->
+                <div class="character-layer">
+                    <div class="character-sprite" id="character-sprite">
+                        <div class="character-body">👩‍🏫</div>
+                        <div class="character-mouth"></div>
+                        <div class="character-shadow"></div>
+                        <div class="hint-bubble">Click me! 👋</div>
+                    </div>
+                </div>
+                
+                <!-- 动态内容层（图片/视频） -->
+                <div class="content-layer" id="content-layer">
+                    <!-- 动态插入图片和视频 -->
+                </div>
+                
+                <!-- 对话气泡（附着在角色旁边） -->
+                <div class="speech-bubble" id="speech-bubble">
+                    <div class="bubble-text" id="bubble-text">Hello! I'm Miss Emma!</div>
+                    <div class="bubble-cn" id="bubble-cn">你好！我是 Emma 老师！</div>
+                    <button class="speak-btn" onclick="speakCurrent()">🔊</button>
+                </div>
+            </div>
+            
+            <!-- 底部交互区 -->
+            <div class="interaction-bar">
+                <!-- ⭐ 新增：音频控制栏（RTC 模式） -->
+                <div class="audio-control-bar" id="audio-control-bar" style="display: none;">
+                    <button id="mute-btn" onclick="toggleMute()" class="control-btn">
+                        🎤 静音
+                    </button>
+                    <div id="audio-level-indicator" class="audio-level">
+                        <div class="level-bar"></div>
+                    </div>
+                    <div id="rtc-status" class="rtc-status">
+                        🟢 连接中...
+                    </div>
+                </div>
+                
+                <div class="recording-status" id="recording-status"></div>
+                <div class="input-controls">
+                    <button id="record-btn" class="record-btn" onclick="toggleRecording()">
+                        <span class="record-icon">🎤</span>
+                        <span class="record-text">按住说话</span>
+                    </button>
+                    <div class="quick-actions" id="quick-actions">
+                        <!-- 快速回复按钮 -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 设置面板 -->
+            <div class="settings-panel" id="settings-panel">
+                <div class="settings-content">
+                    <h3>⚙️ 设置</h3>
+                    <button onclick="clearMemory()">🗑️ 清除记忆</button>
+                    <button onclick="showScreen('scene-select')">🎪 换个场景</button>
+                    <button onclick="showScreen('character-select')">👋 换个朋友</button>
+                    <button onclick="toggleSettings(false)">❌ 关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 核心模块 -->
+    <script src="js/characters.js"></script>
+    <script src="js/scenes.js"></script>
+    <script src="js/conversations.js"></script>
+    
+    <!-- ⭐ RTC + WebSocket 模块（按顺序加载） -->
+    <script src="js/rtc-client.js"></script>
+    <script src="js/websocket-client.js"></script>
+    
+    <!-- 主应用 -->
+    <script src="js/app.js"></script>
+</body>
+</html>

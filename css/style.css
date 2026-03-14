@@ -1,0 +1,901 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.app-container {
+    max-width: 800px;
+    margin: 0 auto;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.screen {
+    display: none;
+    flex: 1;
+    animation: fadeIn 0.3s ease;
+    overflow: hidden;
+}
+
+.screen.active {
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Character Select */
+#character-select {
+    padding: 30px 20px;
+    overflow-y: auto;
+}
+
+h1 {
+    color: white;
+    text-align: center;
+    font-size: 1.8em;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.subtitle {
+    color: rgba(255,255,255,0.9);
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 1.1em;
+}
+
+.character-grid, .scene-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+}
+
+.character-card, .scene-card {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.character-card:hover, .scene-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+
+.avatar, .scene-icon {
+    font-size: 3.5em;
+    margin-bottom: 10px;
+}
+
+.character-card h3, .scene-card h3 {
+    color: #333;
+    margin-bottom: 5px;
+    font-size: 1.1em;
+}
+
+.character-card p, .scene-card p {
+    color: #666;
+    font-size: 0.85em;
+}
+
+.back-btn {
+    display: block;
+    margin: 20px auto;
+    padding: 12px 30px;
+    background: rgba(255,255,255,0.3);
+    color: white;
+    border: 2px solid white;
+    border-radius: 25px;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.back-btn:hover {
+    background: rgba(255,255,255,0.5);
+}
+
+/* Canvas Screen */
+#canvas-screen {
+    background: #1a1a2e;
+}
+
+.canvas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0,0,0,0.3);
+    padding: 10px 15px;
+    color: white;
+}
+
+.back-btn-small, .settings-btn {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.back-btn-small:hover, .settings-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.character-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1em;
+    font-weight: bold;
+}
+
+/* Canvas Container */
+.canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%);
+}
+
+.canvas-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.3;
+}
+
+/* Character Layer */
+.character-layer {
+    position: absolute;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.character-sprite {
+    position: absolute;
+    transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    animation: characterFloat 3s ease-in-out infinite;
+}
+
+@keyframes characterFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.character-body {
+    position: relative;
+    font-size: 8em;
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+    transition: transform 0.3s;
+}
+
+/* 说话动画 - 简单版（嘴巴开合） */
+.character-sprite.talking .character-body {
+    animation: talkMouth 0.2s infinite;
+}
+
+@keyframes talkMouth {
+    0%, 100% { 
+        transform: scaleY(1);
+        filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+    }
+    50% { 
+        transform: scaleY(1.05);
+        filter: drop-shadow(0 10px 25px rgba(255,200,100,0.5));
+    }
+}
+
+/* 说话动画 - 升级版（带嘴巴图片切换） */
+.character-mouth {
+    position: absolute;
+    bottom: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30%;
+    height: 15%;
+    background: #ff6b6b;
+    border-radius: 50%;
+    display: none;
+    z-index: 5;
+}
+
+.character-sprite.talking .character-mouth {
+    display: block;
+    animation: mouthOpenClose 0.15s infinite;
+}
+
+@keyframes mouthOpenClose {
+    0%, 100% { 
+        height: 5%;
+        background: #ff6b6b;
+    }
+    50% { 
+        height: 15%;
+        background: #ff5252;
+    }
+}
+
+/* 表情状态 */
+.character-sprite.happy .character-body::after {
+    content: '✨';
+    position: absolute;
+    top: -20px;
+    right: -20px;
+    font-size: 0.3em;
+    animation: sparkle 1s infinite;
+}
+
+@keyframes sparkle {
+    0%, 100% { opacity: 0; transform: scale(0); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+.character-sprite.excited .character-body {
+    animation: excitedJump 0.3s infinite;
+}
+
+@keyframes excitedJump {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px) scaleY(1.05); }
+}
+
+.character-sprite.walking .character-body {
+    animation: walkBounce 0.4s infinite;
+}
+
+@keyframes walkBounce {
+    0%, 100% { transform: rotate(-5deg); }
+    50% { transform: rotate(5deg); }
+}
+
+.character-sprite.pointing .character-body {
+    transform: scaleX(-1);
+}
+
+.character-sprite.jumping .character-body {
+    animation: jumpUp 0.6s ease;
+}
+
+@keyframes jumpUp {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-50px) scale(1.1); }
+}
+
+.character-sprite.waving .character-body {
+    animation: waveHand 1s ease-in-out;
+}
+
+@keyframes waveHand {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-20deg); }
+    75% { transform: rotate(20deg); }
+}
+
+.character-sprite.clapping .character-body {
+    animation: clapHands 0.5s infinite;
+}
+
+@keyframes clapHands {
+    0%, 100% { transform: scaleX(1); }
+    50% { transform: scaleX(0.9); }
+}
+
+.character-sprite.thinking .character-body {
+    animation: thinkTilt 2s ease-in-out infinite;
+}
+
+@keyframes thinkTilt {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-10deg); }
+}
+
+.character-shadow {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 20px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.3) 0%, transparent 70%);
+    filter: blur(5px);
+    transition: all 0.3s;
+}
+
+.character-sprite.walking .character-shadow {
+    animation: shadowScale 0.4s infinite;
+}
+
+@keyframes shadowScale {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.3; }
+    50% { transform: translateX(-50%) scale(0.8); opacity: 0.2; }
+}
+
+/* 角色情绪状态 */
+.character-sprite.happy .character-body {
+    filter: drop-shadow(0 10px 20px rgba(255,200,0,0.5));
+}
+
+.character-sprite.excited .character-body {
+    animation: excitedShake 0.5s infinite;
+}
+
+@keyframes excitedShake {
+    0%, 100% { transform: rotate(-3deg); }
+    50% { transform: rotate(3deg); }
+}
+
+/* 角色点击互动 */
+.character-sprite {
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.character-sprite:active .character-body {
+    transform: scale(0.95);
+}
+
+/* 角色气泡提示 */
+.character-sprite .hint-bubble {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    white-space: nowrap;
+    box-shadow: 0 3px 15px rgba(0,0,0,0.2);
+    animation: hintFloat 2s ease-in-out infinite;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.character-sprite:hover .hint-bubble {
+    opacity: 1;
+}
+
+@keyframes hintFloat {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-5px); }
+}
+
+/* Content Layer (Images/Videos) */
+.content-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.dynamic-content {
+    position: absolute;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    overflow: hidden;
+    animation: contentPop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+@keyframes contentPop {
+    0% { opacity: 0; transform: scale(0); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.dynamic-content img, .dynamic-content video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.dynamic-content .content-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 8px;
+    text-align: center;
+    font-size: 0.9em;
+}
+
+.dynamic-content .close-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: none;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1em;
+    z-index: 10;
+}
+
+/* Speech Bubble */
+.speech-bubble {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border-radius: 25px;
+    padding: 20px 25px;
+    max-width: 80%;
+    box-shadow: 0 5px 30px rgba(0,0,0,0.2);
+    z-index: 20;
+    animation: bubbleFloat 2s ease-in-out infinite;
+}
+
+@keyframes bubbleFloat {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-5px); }
+}
+
+.bubble-text {
+    font-size: 1.3em;
+    color: #333;
+    line-height: 1.4;
+    margin-bottom: 5px;
+}
+
+.bubble-cn {
+    font-size: 0.9em;
+    color: #888;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+}
+
+.speak-btn {
+    position: absolute;
+    top: -15px;
+    right: -15px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.2em;
+    cursor: pointer;
+    box-shadow: 0 3px 15px rgba(102,126,234,0.4);
+    transition: transform 0.2s;
+}
+
+.speak-btn:hover {
+    transform: scale(1.1);
+}
+
+/* Interaction Bar */
+.interaction-bar {
+    background: white;
+    padding: 15px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.recording-status {
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    color: #666;
+    min-height: 20px;
+}
+
+.input-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.record-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 50px;
+    font-size: 1.2em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(238,90,90,0.4);
+}
+
+.record-btn:hover {
+    transform: scale(1.02);
+}
+
+.record-btn.recording {
+    background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 4px 15px rgba(78,205,196,0.4); }
+    50% { box-shadow: 0 4px 25px rgba(78,205,196,0.8); }
+}
+
+.record-icon {
+    font-size: 1.4em;
+}
+
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.quick-action-btn {
+    background: #f0f0f0;
+    border: 2px solid #667eea;
+    color: #667eea;
+    padding: 10px 18px;
+    border-radius: 25px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-action-btn:hover {
+    background: #667eea;
+    color: white;
+    transform: scale(1.05);
+}
+
+/* Settings Panel */
+.settings-panel {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-panel.active {
+    display: flex;
+}
+
+.settings-content {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 300px;
+    width: 90%;
+}
+
+.settings-content h3 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.settings-content button {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 1em;
+    cursor: pointer;
+    background: #f0f0f0;
+    transition: background 0.2s;
+}
+
+.settings-content button:hover {
+    background: #e0e0e0;
+}
+
+.settings-content button:first-of-type {
+    background: #ffe0e0;
+    color: #d32f2f;
+}
+
+/* RTC Video Layer */
+.rtc-video-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    display: none;
+    background: rgba(0, 0, 0, 0.85);
+    align-items: center;
+    justify-content: center;
+}
+
+.rtc-video-layer.active {
+    display: flex;
+}
+
+.video-container {
+    width: 90%;
+    max-width: 600px;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    position: relative;
+}
+
+.video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.toggle-video-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 0.9em;
+    cursor: pointer;
+    z-index: 20;
+    transition: all 0.2s;
+}
+
+.toggle-video-btn:hover {
+    background: white;
+    transform: scale(1.05);
+}
+
+/* Loading Animation */
+.video-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 1.2em;
+    text-align: center;
+}
+
+.video-loading::before {
+    content: '⏳';
+    display: block;
+    font-size: 3em;
+    margin-bottom: 15px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0%, 100% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Error State */
+.video-error {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 50, 50, 0.9);
+    padding: 25px;
+    border-radius: 15px;
+    color: white;
+    text-align: center;
+    max-width: 80%;
+}
+
+.video-error button {
+    margin-top: 15px;
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: none;
+    background: white;
+    color: #333;
+    font-size: 1em;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.video-error button:hover {
+    transform: scale(1.05);
+}
+
+/* ==================== 音频控制栏（RTC 模式） ==================== */
+
+.audio-control-bar {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px 20px;
+    border-radius: 30px;
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+.audio-control-bar.show {
+    display: flex;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.control-btn {
+    background: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #333;
+}
+
+.control-btn:hover {
+    background: #f0f0f0;
+    transform: scale(1.05);
+}
+
+.control-btn.muted {
+    background: #ff6b6b;
+    color: white;
+}
+
+.control-btn.muted:hover {
+    background: #ff5252;
+}
+
+/* 音频电平指示器 */
+.audio-level {
+    width: 80px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.level-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A, #FFC107, #ff6b6b);
+    background-size: 200% 100%;
+    transition: width 0.1s ease;
+    border-radius: 3px;
+}
+
+.level-bar.low {
+    background-position: 0% 0%;
+}
+
+.level-bar.medium {
+    background-position: 50% 0%;
+}
+
+.level-bar.high {
+    background-position: 100% 0%;
+}
+
+/* RTC 状态指示器 */
+.rtc-status {
+    color: white;
+    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 80px;
+}
+
+.rtc-status::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4CAF50;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.rtc-status.connecting::before {
+    background: #FFC107;
+    animation: pulse 0.5s infinite;
+}
+
+.rtc-status.error::before {
+    background: #ff6b6b;
+    animation: none;
+}
+
+/* ==================== 响应式设计 ==================== */
+
+@media (max-width: 600px) {
+    .character-grid, .scene-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .character-body {
+        font-size: 6em;
+    }
+    
+    .bubble-text {
+        font-size: 1.1em;
+    }
+    
+    .speech-bubble {
+        max-width: 90%;
+        padding: 15px;
+    }
+    
+    .video-container {
+        width: 95%;
+    }
+    
+    .toggle-video-btn {
+        top: 10px;
+        right: 10px;
+        padding: 8px 15px;
+        font-size: 0.8em;
+    }
+}
