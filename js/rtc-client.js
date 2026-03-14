@@ -1,79 +1,73 @@
 // RTC 客户端模块 - 火山云数字人视频播放 + 双向音频流
+// 基于火山引擎 RTC Web SDK 官方文档
 // 支持：孩子音频上传 + 数字人视频/音频下载
 class RTCAvatarClient {
     constructor(options = {}) {
         this.appId = options.appId;
-        this.client = null;
-        this.localTracks = { audio: null, video: null };
+        this.engine = null;
+        this.localUserId = null;
         this.remoteUsers = new Map();
         this.onVideoReady = options.onVideoReady;
         this.onError = options.onError;
-        this.onLocalAudioPublished = options.onLocalAudioPublished; // 本地音频发布回调
-        this.asrEnabled = options.asrEnabled || false; // 是否启用实时 ASR
+        this.onLocalAudioPublished = options.onLocalAudioPublished;
+        this.asrEnabled = options.asrEnabled || false;
     }
 
-    // 初始化 RTC 客户端
+    // 初始化 RTC 引擎（官方 API：createEngine）
     async init() {
         try {
             // 检查 SDK 是否加载
-            if (!window.VE_RTC) {
+            if (!window.VERTC) {
                 throw new Error('RTC SDK not loaded');
             }
 
-            this.client = VE_RTC.createClient({
-                mode: 'live',
-                codec: 'vp8',
-                appId: this.appId
-            });
+            // 使用官方推荐的 createEngine API
+            this.engine = window.VERTC.createEngine(this.appId);
 
-            // 监听用户发布
-            this.client.on('user-published', async (user, mediaType) => {
-                console.log('User published:', user, mediaType);
-                await this.subscribe(user, mediaType);
-            });
+            // 监听事件（官方 API）
+            this.engine.on(window.VERTC.events.onUserPublishStream, this.handleUserPublishStream.bind(this));
+            this.engine.on(window.VERTC.events.onUserUnPublishStream, this.handleUserUnpublishStream.bind(this));
+            this.engine.on(window.VERTC.events.onUserJoin, this.handleUserJoin.bind(this));
+            this.engine.on(window.VERTC.events.onUserLeave, this.handleUserLeave.bind(this));
 
-            // 监听用户取消发布
-            this.client.on('user-unpublished', (user, mediaType) => {
-                console.log('User unpublished:', user, mediaType);
-                this.unsubscribe(user, mediaType);
-            });
-
-            // 监听用户加入
-            this.client.on('user-joined', (user) => {
-                console.log('User joined:', user);
-            });
-
-            // 监听用户离开
-            this.client.on('user-left', (user) => {
-                console.log('User left:', user);
-            });
-
-            console.log('RTC client initialized');
+            console.log('✅ RTC engine initialized');
         } catch (error) {
-            console.error('Failed to init RTC:', error);
+            console.error('❌ Failed to init RTC engine:', error);
             if (this.onError) this.onError(error);
             throw error;
         }
     }
 
-    // 加入 RTC 房间并发布本地音频流
+    // 加入 RTC 房间（官方 API：joinRoom）
     async join(roomId, token, uid = 'child_' + Date.now(), options = {}) {
         try {
-            if (!this.client) {
+            if (!this.engine) {
                 await this.init();
             }
 
-            await this.client.join({
-                roomId: roomId,
-                token: token,
-                uid: uid
-            });
+            this.localUserId = uid;
+
+            // 官方 API：joinRoom
+            await this.engine.joinRoom(
+                token,
+                roomId,
+                {
+                    userId: uid
+                },
+                {
+                    isAutoPublish: true, // 自动发布本地流
+                    isAutoSubscribeAudio: true, // 自动订阅音频
+                    isAutoSubscribeVideo: true, // 自动订阅视频
+                    roomProfileType: window.VE_RTC?.RoomProfileType?.communication || 
+                                    window.VERTC?.RoomProfileType?.communication
+                }
+            );
 
             console.log('✅ Joined room:', roomId, 'as', uid);
 
-            // ⭐ 新增：发布本地音频流（孩子说话）
+            // 开启本地音视频采集
             if (options.publishAudio !== false) {
-                await this.publishLocalAudio();
+                await this.startLocalCapture();
             }
 
             return uid;
@@ -84,51 +78,44 @@ class RTCAvatarClient {
         }
     }
 
-    // 发布本地音频流（采集麦克风并上传）
-    async publishLocalAudio() {
+    // 开启本地音视频采集（官方 API：startAudioCapture/startVideoCapture）
+    async startLocalCapture() {
         try {
-            // 创建本地音频轨道（麦克风）
-            this.localTracks.audio = await VE_RTC.createAudioTrack({
-                microphoneId: 'default',
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            });
+            // 开启音频采集
+            await this.engine.startAudioCapture();
+            console.log('🎤 Local audio capture started');
 
-            // 发布到 RTC 房间
-            await this.client.publish({
-                audioTrack: this.localTracks.audio
-            });
-
-            console.log('🎤 Local audio published');
-
-            if (this.onLocalAudioPublished) {
-                this.onLocalAudioPublished(this.localTracks.audio);
+            // 设置本地视频播放器（如果有视频）
+            const localPlayer = document.getElementById('local-player');
+            if (localPlayer) {
+                this.engine.setLocalVideoPlayer(window.VERTC.StreamIndex.STREAM_INDEX_MAIN, {
+                    renderDom: 'local-player'
+                });
             }
 
-            // ⭐ 可选：实时 ASR（将音频流发送到语音识别服务）
+            if (this.onLocalAudioPublished) {
+                this.onLocalAudioPublished();
+            }
+
+            // ⭐ 可选：实时 ASR（从采集的音频流中获取数据）
             if (this.asrEnabled) {
-                this.startRealtimeASR(this.localTracks.audio);
+                this.startRealtimeASR();
             }
 
         } catch (error) {
-            console.error('❌ Failed to publish local audio:', error);
-            // 非致命错误，继续运行
+            console.error('❌ Failed to start local capture:', error);
+            if (this.onError) this.onError(error);
         }
     }
 
-    // 停止本地音频发布
-    async unpublishLocalAudio() {
+    // 停止本地采集
+    async stopLocalCapture() {
         try {
-            if (this.localTracks.audio) {
-                await this.client.unpublish(this.localTracks.audio);
-                this.localTracks.audio.stop();
-                this.localTracks.audio.close();
-                this.localTracks.audio = null;
-                console.log('🔇 Local audio unpublished');
-            }
+            await this.engine.stopAudioCapture();
+            await this.engine.stopVideoCapture();
+            console.log('🔇 Local capture stopped');
         } catch (error) {
-            console.error('Failed to unpublish local audio:', error);
+            console.error('Failed to stop local capture:', error);
         }
     }
 
@@ -163,63 +150,68 @@ class RTCAvatarClient {
         detectSpeech();
     }
 
-    // 订阅远端流（数字人视频）
-    async subscribe(user, mediaType) {
+    // 处理远端用户发布流（官方事件回调）
+    async handleUserPublishStream(e) {
+        const { userId, mediaType } = e;
+        console.log('📥 User published stream:', userId, mediaType);
+
         try {
-            await this.client.subscribe(user, mediaType);
-
-            if (mediaType === 'video') {
-                const videoTrack = user.videoTrack;
-                if (videoTrack) {
-                    // 播放视频
-                    videoTrack.play('avatar-video-container');
-                    console.log('Video playing');
-                    
-                    if (this.onVideoReady) {
-                        this.onVideoReady();
+            // 设置远端视频播放器
+            const player = document.querySelector('#avatar-video-container');
+            if (player) {
+                await this.engine.setRemoteVideoPlayer(
+                    window.VERTC.StreamIndex.STREAM_INDEX_MAIN,
+                    {
+                        userId: userId,
+                        renderDom: player
                     }
+                );
+                console.log('📺 Remote video playing');
+                
+                if (this.onVideoReady) {
+                    this.onVideoReady();
                 }
             }
-
-            if (mediaType === 'audio') {
-                const audioTrack = user.audioTrack;
-                if (audioTrack) {
-                    audioTrack.play();
-                    console.log('Audio playing');
-                }
-            }
-
-            this.remoteUsers.set(user.uid, user);
+            
+            this.remoteUsers.set(userId, { userId, mediaType });
         } catch (error) {
-            console.error('Failed to subscribe:', error);
-            if (this.onError) this.onError(error);
-            throw error;
+            console.error('❌ Failed to setup remote player:', error);
         }
     }
 
-    // 取消订阅
-    unsubscribe(user, mediaType) {
-        this.remoteUsers.delete(user.uid);
-        console.log('Unsubscribed from:', user.uid);
+    // 处理远端用户取消发布
+    handleUserUnpublishStream(e) {
+        const { userId } = e;
+        console.log('📴 User unpublished stream:', userId);
+        this.remoteUsers.delete(userId);
     }
 
-    // 离开房间
+    // 处理用户加入
+    handleUserJoin(e) {
+        const { userId } = e;
+        console.log('👤 User joined:', userId);
+    }
+
+    // 处理用户离开
+    handleUserLeave(e) {
+        const { userId } = e;
+        console.log('👋 User left:', userId);
+        this.remoteUsers.delete(userId);
+    }
+
+    // 离开房间（官方 API：leaveRoom）
     async leave() {
         try {
-            // 停止本地轨道
-            await this.unpublishLocalAudio();
-            
-            if (this.localTracks.video) {
-                this.localTracks.video.stop();
-                this.localTracks.video = null;
-            }
+            // 停止本地采集
+            await this.stopLocalCapture();
 
-            if (this.client) {
-                await this.client.leave();
+            // 离开房间
+            if (this.engine) {
+                await this.engine.leaveRoom();
+                console.log('👋 Left room');
             }
 
             this.remoteUsers.clear();
-            console.log('👋 Left room');
         } catch (error) {
             console.error('❌ Failed to leave room:', error);
             throw error;
@@ -261,10 +253,10 @@ class RTCAvatarClient {
 window.rtAvatarClient = null;
 window.currentSessionId = null;
 
-// 初始化函数
+// 初始化函数（使用官方 VERTC 全局对象）
 function initRTCAvatar(appId, options = {}) {
     // 检查 SDK 是否可用
-    if (!window.VE_RTC) {
+    if (!window.VERTC) {
         console.warn('⚠️ RTC SDK not available, using animation mode');
         window.rtAvatarClient = null;
         return null;
@@ -272,14 +264,13 @@ function initRTCAvatar(appId, options = {}) {
 
     window.rtAvatarClient = new RTCAvatarClient({
         appId: appId,
-        asrEnabled: options.asrEnabled || true, // 默认启用实时 ASR
+        asrEnabled: options.asrEnabled || true,
         onVideoReady: () => {
             console.log('🎬 Video is ready!');
             hideLoading();
         },
-        onLocalAudioPublished: (audioTrack) => {
-            console.log('🎤 Local audio published, starting ASR...');
-            // 可以在这里开始实时语音识别
+        onLocalAudioPublished: () => {
+            console.log('🎤 Local audio capture started');
         },
         onError: (error) => {
             console.error('❌ RTC Error:', error);

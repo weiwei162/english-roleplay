@@ -5,19 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>English Friend - 英语好朋友</title>
     <link rel="stylesheet" href="css/style.css">
-    <!-- 火山云 RTC SDK - 动态加载，加载失败时使用动画模式 -->
+    <!-- 火山云 RTC SDK - 官方 CDN -->
+    <!-- 参考文档：https://www.volcengine.com/docs/6348/75707 -->
     <script>
         // 动态加载 RTC SDK，失败时优雅降级
         (function() {
             var script = document.createElement('script');
-            script.src = 'https://lf-unpkg.volccdn.com/obj/vcloudfe/sdk/@volcengine/rtc/4.68.1/1768907951725/index.min.js';
+            // 使用官方 CDN 地址
+            script.src = 'https://lf3-beecdn.bceapps.com/obj/vcloudfe/volcengine-rtc-web-sdk/@volcengine/rtc/latest/index.min.js';
             script.async = true;
             script.onerror = function() {
                 console.warn('⚠️ RTC SDK 加载失败，使用动画模式');
-                window.VE_RTC = null; // 标记 SDK 不可用
+                window.VERTC = null;
             };
             script.onload = function() {
-                console.log('✅ RTC SDK 加载成功');
+                console.log('✅ RTC SDK 加载成功，全局对象：VERTC');
             };
             document.head.appendChild(script);
         })();
