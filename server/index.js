@@ -1,5 +1,5 @@
-// 阿里云百炼 + RTC 双向实时对话服务端
-// 支持：RTC 双向音频 + 百炼 ASR 实时识别 + Qwen 对话 + TTS 语音合成
+// 阿里云百炼 + 火山 RTC OpenAPI 实时对话服务端
+// 支持：RTC 双向音频 + 火山 OpenAPI 推流 + 百炼 ASR + Qwen 对话 + TTS
 // 使用前请安装依赖：npm install
 
 const express = require('express');
@@ -11,7 +11,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const WebSocket = require('websocket');
-const RTCBot = require('./rtc-bot');
+const { VolcRTCClient } = require('./volc-rtc-client');
 const { synthesizeSpeech, testTTS } = require('./tts-client');
 require('dotenv').config();
 
@@ -82,14 +82,18 @@ wss = new WebSocketServer({ server });
 // 会话存储
 const sessions = new Map();
 
-// RTC 房间存储（房间 ID → Bot 实例 + 会话信息）
-const rtcSessions = new Map();
-
 // ASR WebSocket 连接存储（sessionId → ASR WebSocket）
 const asrConnections = new Map();
 
 // 音频缓存（用于 VAD 检测）
-const audioBuffers = new Map(); // roomId → { buffer: [], lastSpoke: timestamp }
+const audioBuffers = new Map(); // sessionId → { buffer: [], lastSpoke: timestamp }
+
+// 火山 RTC OpenAPI 客户端
+const rtcClient = new VolcRTCClient({
+    appId: process.env.VOLC_APP_ID,
+    appKey: process.env.VOLC_APP_KEY,
+    region: 'cn-north-1'
+});
 
 // ==================== ⭐ 新增：服务前端静态文件 ====================
 

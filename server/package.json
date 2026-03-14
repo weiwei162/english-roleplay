@@ -5,11 +5,14 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "start:rtc": "node index-rtc-openapi.js",
     "dev": "nodemon index.js",
+    "dev:rtc": "nodemon index-rtc-openapi.js",
     "configure": "bash configure.sh",
-    "test": "node test-rtc-bot.js",
+    "test": "node test-e2e.js",
+    "test:e2e": "node test-e2e.js",
     "test:bailian": "node test-bailian.js",
-    "test:rtc": "node test-rtc-bot.js",
+    "test:rtc": "node -e \"const {testRTCClient} = require('./volc-rtc-client'); testRTCClient()\"",
     "test:doubao": "node -e \"require('./test-api.js'); testDoubaoAPI()\""
   },
   "dependencies": {
