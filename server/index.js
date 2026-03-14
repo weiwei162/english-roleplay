@@ -1,6 +1,6 @@
-// 火山云 RTC + 豆包 API 服务端（全栈版 + HTTPS）
-// 支持：前端静态文件 + WebSocket + API + 双向 RTC + HTTPS
-// 使用前请安装依赖：npm install express cors dotenv crypto ws https
+// 阿里云百炼 + RTC 服务端（全栈版 + HTTPS）
+// 支持：前端静态文件 + WebSocket + API + 百炼 ASR 实时语音识别 + 百炼 Qwen 对话
+// 使用前请安装依赖：npm install express cors dotenv crypto ws https websocket-client
 
 const express = require('express');
 const cors = require('cors');
@@ -10,6 +10,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const WebSocket = require('websocket-client');
 require('dotenv').config();
 
 const app = express();
@@ -82,6 +83,9 @@ const sessions = new Map();
 // RTC 房间存储（房间 ID → 参与者信息）
 const rtcRooms = new Map();
 
+// ASR WebSocket 连接存储（sessionId → ASR WebSocket）
+const asrConnections = new Map();
+
 // ==================== ⭐ 新增：服务前端静态文件 ====================
 
 // 服务 english-roleplay 目录下的所有静态文件
@@ -101,12 +105,13 @@ app.get('/health', (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         services: {
-            rtc: process.env.VOLC_APP_ID && !process.env.VOLC_APP_ID.includes('your_') ? 'configured' : 'not configured',
-            doubao: process.env.DOUBAO_API_KEY && !process.env.DOUBAO_API_KEY.includes('your_') ? 'configured' : 'not configured',
+            bailian: process.env.DASHSCOPE_API_KEY && !process.env.DASHSCOPE_API_KEY.includes('sk-xxx') ? 'configured' : 'not configured',
+            llm_model: process.env.LLM_MODEL || 'qwen-plus',
+            asr_model: process.env.ASR_MODEL || 'qwen3-asr-flash-realtime',
             websocket: 'enabled'
         },
         activeSessions: sessions.size,
-        activeRooms: rtcRooms.size,
+        activeAsrConnections: asrConnections.size,
         frontend: 'served'
     });
 });
@@ -171,29 +176,30 @@ app.post('/api/create-room', (req, res) => {
     }
 });
 
-// ==================== 豆包 API 调用 ====================
+// ==================== 阿里云百炼 Qwen API 调用 ====================
 
-async function callDoubaoAPI(messages) {
-    const apiKey = process.env.DOUBAO_API_KEY;
+async function callQwenAPI(messages, model = 'qwen-plus') {
+    const apiKey = process.env.DASHSCOPE_API_KEY;
     
     if (!apiKey) {
-        throw new Error('Please set DOUBAO_API_KEY in .env file');
+        throw new Error('Please set DASHSCOPE_API_KEY in .env file');
     }
     
-    const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+    const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'doubao-pro-32k',
+            model: model,
             messages: messages
         })
     });
     
     if (!response.ok) {
-        throw new Error(`Doubao API error: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Qwen API error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
@@ -251,8 +257,9 @@ app.post('/api/chat', async (req, res) => {
             { role: 'user', content: text }
         ];
         
-        // 调用豆包生成回应
-        const reply = await callDoubaoAPI(messages);
+        // 调用百炼 Qwen 生成回应
+        const model = process.env.LLM_MODEL || 'qwen-plus';
+        const reply = await callQwenAPI(messages, model);
         
         // 更新会话
         session.messages.push({ role: 'user', content: text });
@@ -344,21 +351,7 @@ wss.on('connection', (ws, req) => {
                 }
 
                 // 将音频块发送到 ASR 服务进行识别
-                const text = await recognizeSpeech(data.audio);
-                
-                if (text) {
-                    console.log('🎤 Recognized speech:', text);
-                    
-                    // 触发对话流程
-                    const response = await processChildSpeech(text, sessionId);
-                    
-                    ws.send(JSON.stringify({
-                        type: 'response',
-                        text: response.text,
-                        roomId: response.roomId,
-                        token: response.token
-                    }));
-                }
+                await recognizeSpeech(data.audio, sessionId, ws);
             }
 
             // 接收文字输入（降级方案）
@@ -392,31 +385,187 @@ wss.on('connection', (ws, req) => {
     });
 });
 
-// 语音识别（调用火山引擎 ASR）
-async function recognizeSpeech(audioBase64) {
-    // TODO: 调用火山引擎语音识别 API
-    // 这里先返回模拟结果用于测试
+// 语音识别（阿里云百炼 qwen3-asr-flash-realtime 实时 ASR）
+class RealtimeASR {
+    constructor(sessionId, ws, onFinalText) {
+        this.sessionId = sessionId;
+        this.ws = ws;  // WebSocket 连接到前端
+        this.onFinalText = onFinalText;  // 最终识别文本回调
+        this.asrWs = null;
+        this.isConnected = false;
+        this.lastTranscript = '';
+    }
+
+    async connect() {
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        const wsUrl = process.env.ASR_WS_URL || 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime';
+        
+        if (!apiKey) {
+            throw new Error('DASHSCOPE_API_KEY not configured');
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                this.asrWs = new WebSocket(wsUrl + '?model=qwen3-asr-flash-realtime', {
+                    headers: {
+                        'Authorization': 'Bearer ' + apiKey,
+                        'OpenAI-Beta': 'realtime=v1'
+                    }
+                });
+
+                this.asrWs.on('open', () => {
+                    console.log('✅ ASR WebSocket connected for session:', this.sessionId);
+                    this.isConnected = true;
+
+                    // 发送会话配置
+                    const sessionUpdate = {
+                        type: 'session.update',
+                        session: {
+                            input_audio_format: 'pcm',
+                            sample_rate: 16000,
+                            input_audio_transcription: {
+                                language: 'en'  // 英语识别
+                            },
+                            turn_detection: {
+                                type: 'server_vad',
+                                threshold: 0.0,
+                                silence_duration_ms: 400
+                            }
+                        }
+                    };
+
+                    this.asrWs.send(JSON.stringify(sessionUpdate));
+                    resolve();
+                });
+
+                this.asrWs.on('message', (data) => {
+                    try {
+                        const event = JSON.parse(data.toString());
+                        
+                        // 实时识别结果（流式）- 可选推送给前端
+                        if (event.type === 'conversation.item.input_audio_transcription.text') {
+                            const text = event.text || '';
+                            this.lastTranscript = text;
+                            // 可选：推送实时字幕给前端
+                            // this.ws.send(JSON.stringify({ type: 'asr_partial', text: text }));
+                        }
+                        
+                        // 最终识别结果 - 触发对话
+                        if (event.type === 'conversation.item.input_audio_transcription.completed') {
+                            const transcript = event.transcript || '';
+                            console.log('🎤 ASR Final:', transcript);
+                            
+                            if (this.onFinalText && transcript.trim()) {
+                                // 触发对话流程
+                                this.onFinalText(transcript, this.sessionId);
+                            }
+                        }
+
+                        // 语音开始/结束事件
+                        if (event.type === 'input_audio_buffer.speech_started') {
+                            console.log('🗣️ Speech started for session:', this.sessionId);
+                            // 可以推送"思考中"状态给前端
+                        }
+                        
+                        if (event.type === 'input_audio_buffer.speech_stopped') {
+                            console.log('🔇 Speech stopped for session:', this.sessionId);
+                        }
+
+                    } catch (error) {
+                        console.error('❌ ASR parse error:', error);
+                    }
+                });
+
+                this.asrWs.on('error', (error) => {
+                    console.error('❌ ASR WebSocket error:', error);
+                    reject(error);
+                });
+
+                this.asrWs.on('close', (code, reason) => {
+                    console.log('🔌 ASR WebSocket closed:', code, reason);
+                    this.isConnected = false;
+                });
+
+            } catch (error) {
+                console.error('❌ Failed to create ASR WebSocket:', error);
+                reject(error);
+            }
+        });
+    }
+
+    sendAudio(audioBase64) {
+        if (!this.isConnected || !this.asrWs) {
+            console.warn('⚠️ ASR WebSocket not ready');
+            return;
+        }
+
+        try {
+            const event = {
+                type: 'input_audio_buffer.append',
+                audio: audioBase64
+            };
+            this.asrWs.send(JSON.stringify(event));
+        } catch (error) {
+            console.error('❌ Failed to send audio to ASR:', error);
+        }
+    }
+
+    async close() {
+        if (this.asrWs) {
+            // 发送结束事件
+            try {
+                this.asrWs.send(JSON.stringify({
+                    type: 'session.finish'
+                }));
+            } catch (e) {
+                // ignore
+            }
+
+            // 关闭连接
+            await new Promise(resolve => {
+                this.asrWs.close();
+                setTimeout(resolve, 500);
+            });
+            this.asrWs = null;
+            this.isConnected = false;
+        }
+    }
+}
+
+// 语音识别（创建 ASR 连接）
+async function recognizeSpeech(audioBase64, sessionId, ws) {
+    // 检查是否已有 ASR 连接
+    let asr = asrConnections.get(sessionId);
     
-    // 实际调用示例：
-    /*
-    const response = await fetch('https://openspeech.bytedance.com/api/v1/stt', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${process.env.VOLC_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            audio: audioBase64,
-            language: 'en-US',
-            format: 'pcm'
-        })
-    });
-    const data = await response.json();
-    return data.text;
-    */
-    
-    // 模拟返回（测试用）
-    return null;
+    if (!asr) {
+        // 创建新的 ASR 连接，传入最终文本回调
+        asr = new RealtimeASR(sessionId, ws, async (text, sessionId) => {
+            console.log('🎤 ASR Final Text:', text);
+            // 触发对话流程
+            const response = await processChildSpeech(text, sessionId);
+            
+            // 发送回应给前端
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'response',
+                    text: response.text,
+                    roomId: response.roomId,
+                    token: response.token
+                }));
+            }
+        });
+        
+        try {
+            await asr.connect();
+            asrConnections.set(sessionId, asr);
+        } catch (error) {
+            console.error('❌ Failed to connect ASR:', error);
+            return;
+        }
+    }
+
+    // 发送音频块到 ASR
+    asr.sendAudio(audioBase64);
 }
 
 // 处理孩子说话（核心对话流程）
@@ -434,8 +583,9 @@ async function processChildSpeech(text, sessionId) {
         { role: 'user', content: text }
     ];
 
-    // 调用豆包生成回应
-    const reply = await callDoubaoAPI(messages);
+    // 调用百炼 Qwen 生成回应
+    const model = process.env.LLM_MODEL || 'qwen-plus';
+    const reply = await callQwenAPI(messages, model);
 
     // 更新会话
     session.messages.push({ role: 'user', content: text });
@@ -460,12 +610,14 @@ app.get('/health', (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         services: {
-            rtc: process.env.VOLC_APP_ID ? 'configured' : 'not configured',
-            doubao: process.env.DOUBAO_API_KEY ? 'configured' : 'not configured',
+            bailian: process.env.DASHSCOPE_API_KEY && !process.env.DASHSCOPE_API_KEY.includes('sk-xxx') ? 'configured' : 'not configured',
+            llm_model: process.env.LLM_MODEL || 'qwen-plus',
+            asr_model: process.env.ASR_MODEL || 'qwen3-asr-flash-realtime',
             websocket: 'enabled'
         },
         activeSessions: sessions.size,
-        activeRooms: rtcRooms.size
+        activeAsrConnections: asrConnections.size,
+        frontend: 'served'
     });
 });
 
@@ -476,28 +628,34 @@ server.listen(USE_HTTPS ? HTTPS_PORT : HTTP_PORT, () => {
     const protocol = USE_HTTPS ? 'https' : 'http';
     const port = USE_HTTPS ? HTTPS_PORT : HTTP_PORT;
     
+    const llmModel = process.env.LLM_MODEL || 'qwen-plus';
+    const asrModel = process.env.ASR_MODEL || 'qwen3-asr-flash-realtime';
+    const bailianConfigured = process.env.DASHSCOPE_API_KEY && !process.env.DASHSCOPE_API_KEY.includes('sk-xxx');
+    
     console.log(`
 ╔══════════════════════════════════════════════════════╗
-║     English Friend AI Server Running (Full-Stack)   ║
+║   English Friend AI Server - Alibaba Bailian Edition ║
 ║                                                      ║
 ║   🔒 Protocol:  ${USE_HTTPS ? 'HTTPS (Secure)   ' : 'HTTP (Insecure)'}                        ║
 ║   🌐 Frontend:  ${protocol}://localhost:${port}${' '.repeat(33 - protocol.length - String(port).length)}║
 ║   🔌 WebSocket: ${protocol.replace('http', 'ws')}://localhost:${port}${' '.repeat(33 - protocol.length - String(port).length)}║
 ║   📡 API:       ${protocol}://localhost:${port}/api${' '.repeat(29 - protocol.length - String(port).length)}║
 ║                                                      ║
-║   🎥 RTC:     ${process.env.VOLC_APP_ID && !process.env.VOLC_APP_ID.includes('your_') ? '✅ configured     ' : '❌ not configured'}║
-║   🤖 Doubao:  ${process.env.DOUBAO_API_KEY && !process.env.DOUBAO_API_KEY.includes('your_') ? '✅ configured     ' : '❌ not configured'}║
+║   ☁️ Bailian:  ${bailianConfigured ? '✅ configured     ' : '❌ not configured'}║
+║   🤖 LLM:      ${llmModel.padEnd(18)}║
+║   🎤 ASR:      ${asrModel.padEnd(18)}║
 ║                                                      ║
 ║   ✨ Features:                                        ║
 ║   ✓ 前端静态文件服务（无需 Python）                    ║
-║   ✓ 双向 RTC 音频流（孩子说话 → AI）                   ║
-║   ✓ 实时 ASR 语音识别                                 ║
-║   ✓ 豆包大模型对话生成                               ║
-║   ✓ 数字人视频推流                                   ║
+║   ✓ 阿里云百炼 Qwen 大模型对话                         ║
+║   ✓ 阿里云百炼实时 ASR 语音识别                        ║
+║   ✓ WebSocket 实时通信                                 ║
+║   ✓ 支持 RTC 双向音频（可选火山引擎）                   ║
 ║   ${USE_HTTPS ? '✓ HTTPS 加密连接' : '  设置 USE_HTTPS=true 启用 HTTPS'}                          ║
 ╚══════════════════════════════════════════════════════╝
 
 🚀 现在只需一个命令启动所有服务！
 📱 浏览器访问：${protocol}://localhost:${port}
+🔑 健康检查：${protocol}://localhost:${port}/health
     `);
 });

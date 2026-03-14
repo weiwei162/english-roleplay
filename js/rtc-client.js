@@ -263,6 +263,13 @@ window.currentSessionId = null;
 
 // 初始化函数
 function initRTCAvatar(appId, options = {}) {
+    // 检查 SDK 是否可用
+    if (!window.VE_RTC) {
+        console.warn('⚠️ RTC SDK not available, using animation mode');
+        window.rtAvatarClient = null;
+        return null;
+    }
+
     window.rtAvatarClient = new RTCAvatarClient({
         appId: appId,
         asrEnabled: options.asrEnabled || true, // 默认启用实时 ASR
@@ -285,8 +292,10 @@ function initRTCAvatar(appId, options = {}) {
 
 // 加入房间并观看数字人（双向 RTC 连接）
 async function joinAvatarRoom(roomId, token, sessionId) {
+    // 检查 RTC 客户端是否可用
     if (!window.rtAvatarClient) {
-        throw new Error('RTC client not initialized');
+        console.warn('⚠️ RTC client not available, skipping video avatar');
+        return null;
     }
 
     window.currentSessionId = sessionId;
@@ -331,6 +340,7 @@ function toggleVideoMode() {
 // 显示加载动画
 function showLoading() {
     const container = document.getElementById('avatar-video-container');
+    if (!container) return;
     container.innerHTML = `
         <div class="video-loading">
             <div>⏳ AI 角色正在准备...</div>
@@ -339,16 +349,25 @@ function showLoading() {
     `;
 }
 
+// 隐藏加载动画
+function hideLoading() {
+    const container = document.getElementById('avatar-video-container');
+    if (!container) return;
+    // 清空加载状态
+    const loading = container.querySelector('.video-loading');
+    if (loading) {
+        loading.remove();
+    }
+}
+
 // 显示错误
 function showError(message) {
     const container = document.getElementById('avatar-video-container');
+    if (!container) return;
     container.innerHTML = `
         <div class="video-error">
-            <div>❌ 视频加载失败</div>
-            <div style="font-size: 0.8em; margin-top: 10px;">${message}</div>
-            <button onclick="location.reload()" style="margin-top: 15px; padding: 8px 16px; border-radius: 15px; border: none; background: white; cursor: pointer;">
-                刷新页面
-            </button>
+            <div>⚠️ 视频模式不可用</div>
+            <div style="font-size: 0.8em; margin-top: 10px;">使用动画模式</div>
         </div>
     `;
 }

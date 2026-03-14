@@ -1,5 +1,7 @@
 # 🎨 English Friend - 英语好朋友（画布版）
 
+**v2.0.0** - 阿里云百炼版
+
 为 5 岁小朋友设计的**沉浸式**英语启蒙应用！
 
 ## 🌟 核心理念
@@ -65,9 +67,20 @@
 
 ### 本地运行（全栈版）⭐
 
+**快速开始（5 分钟）：** 详见 [`QUICKSTART-BAILIAN.md`](QUICKSTART-BAILIAN.md)
+
 ```bash
 cd english-roleplay/server
 npm install
+
+# 配置 API Key（阿里云百炼）
+cp .env.example .env
+# 编辑 .env，设置 DASHSCOPE_API_KEY
+
+# 测试 API 连接
+npm test
+
+# 启动服务
 npm start
 ```
 
@@ -159,10 +172,12 @@ docker run -p 3000:3000 english-friend
 
 ## 🛠️ 技术特点
 
-- 纯前端，无需服务器
+- 全栈模式：Node.js 服务端 + 前端 SPA
+- 阿里云百炼 Qwen 大模型对话
+- 阿里云百炼实时 ASR 语音识别
+- WebSocket 实时双向通信
 - Canvas 式布局，非传统聊天
 - 动态内容渲染
-- Web Speech API
 - 响应式设计
 
 ## 📝 扩展开发

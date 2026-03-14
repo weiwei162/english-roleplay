@@ -123,6 +123,33 @@ function toggleRecording() {
     }
 }
 
+// 开始录音
+function startRecording() {
+    if (!recognition) {
+        alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+        return;
+    }
+    
+    try {
+        recognition.start();
+        console.log('🎤 Recording started');
+    } catch (error) {
+        console.error('Failed to start recording:', error);
+    }
+}
+
+// 停止录音
+function stopRecording() {
+    if (!recognition) return;
+    
+    try {
+        recognition.stop();
+        console.log('🔇 Recording stopped');
+    } catch (error) {
+        console.error('Failed to stop recording:', error);
+    }
+}
+
 // 更新录音按钮状态
 function updateRecordButton() {
     const btn = document.getElementById('record-btn');
@@ -640,42 +667,40 @@ function clearMemory() {
     }
 }
 
-// 绑定角色选择事件
-document.querySelectorAll('.character-card').forEach(card => {
-    card.addEventListener('click', function() {
-        const charId = this.getAttribute('data-char');
-        selectCharacter(charId);
+// 绑定事件处理函数
+function bindEvents() {
+    // 角色选择
+    document.querySelectorAll('.character-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const charId = this.getAttribute('data-char');
+            selectCharacter(charId);
+        });
     });
-});
 
-// 绑定场景选择事件
-document.querySelectorAll('.scene-card').forEach(card => {
-    card.addEventListener('click', function() {
-        const sceneId = this.getAttribute('data-scene');
-        selectScene(sceneId);
+    // 场景选择
+    document.querySelectorAll('.scene-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const sceneId = this.getAttribute('data-scene');
+            selectScene(sceneId);
+        });
     });
-});
+
+    // 录音按钮
+    const recordBtn = document.getElementById('record-btn');
+    if (recordBtn) {
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('mouseleave', stopRecording);
+        recordBtn.addEventListener('touchstart', startRecording);
+        recordBtn.addEventListener('touchend', stopRecording);
+    }
+
+    console.log('✅ Events bound');
+}
 
 // RTC 配置
 const VOLC_APP_ID = 'YOUR_APP_ID'; // ⚠️ 替换为你的火山云 AppID
 let rtcInitialized = false;
-
-// 初始化
-document.addEventListener('DOMContentLoaded', function() {
-    initSpeechRecognition();
-    initAudio();
-    
-    // 初始化 RTC
-    initRTC();
-    
-    if ('speechSynthesis' in window) {
-        speechSynthesis.onvoiceschanged = function() {
-            speechSynthesis.getVoices();
-        };
-    }
-    
-    Memory.load();
-});
 
 // RTC 初始化函数
 async function initRTC() {
@@ -684,37 +709,55 @@ async function initRTC() {
     try {
         // 等待 SDK 加载
         await waitForRTCSdk();
-        
+
         // 初始化 RTC 客户端
         initRTCAvatar(VOLC_APP_ID);
-        
+
         rtcInitialized = true;
         console.log('✅ RTC initialized');
     } catch (error) {
-        console.error('❌ Failed to init RTC:', error);
+        // SDK 不可用，使用动画模式
+        console.log('📌 Using animation mode (RTC not available)');
+        rtcInitialized = true; // 标记为已初始化，避免重试
     }
 }
 
 // 等待 SDK 加载
 function waitForRTCSdk() {
     return new Promise((resolve, reject) => {
+        // SDK 已加载
         if (window.VE_RTC) {
             resolve();
             return;
         }
 
+        // SDK 加载失败（被设为 null）
+        if (window.VE_RTC === null) {
+            console.warn('⚠️ RTC SDK not available');
+            reject(new Error('RTC SDK not available'));
+            return;
+        }
+
         const checkInterval = setInterval(() => {
+            // SDK 加载成功
             if (window.VE_RTC) {
                 clearInterval(checkInterval);
                 resolve();
+            }
+            // SDK 加载失败
+            if (window.VE_RTC === null) {
+                clearInterval(checkInterval);
+                reject(new Error('RTC SDK not available'));
             }
         }, 100);
 
         // 超时处理
         setTimeout(() => {
             clearInterval(checkInterval);
+            // 超时后标记为不可用
+            window.VE_RTC = null;
             reject(new Error('RTC SDK load timeout'));
-        }, 10000);
+        }, 5000); // 缩短超时时间到 5 秒
     });
 }
 
@@ -726,24 +769,25 @@ document.addEventListener('visibilitychange', function() {
 
 // ==================== WebSocket 集成 ====================
 
-// 在 DOMContentLoaded 中初始化 WebSocket
-const originalDOMContentLoaded = () => {
-    // 原有初始化代码...
-    initSpeechRecognition();
-    initAudio();
-    bindEvents();
-    Memory.load();
-};
-
-// 重写 DOMContentLoaded 处理
+// DOMContentLoaded 处理
 document.addEventListener('DOMContentLoaded', function() {
-    // 原有初始化
+    // 基础初始化
     initSpeechRecognition();
     initAudio();
     bindEvents();
     Memory.load();
     
-    // ⭐ 新增：初始化 WebSocket（延迟 1 秒确保页面加载完成）
+    // 初始化 RTC
+    initRTC();
+    
+    // 语音合成配置
+    if ('speechSynthesis' in window) {
+        speechSynthesis.onvoiceschanged = function() {
+            speechSynthesis.getVoices();
+        };
+    }
+    
+    // ⭐ 初始化 WebSocket（延迟 1 秒确保页面加载完成）
     setTimeout(() => {
         if (window.initWebSocket) {
             console.log('🔌 Initializing WebSocket...');

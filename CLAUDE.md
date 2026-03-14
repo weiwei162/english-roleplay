@@ -40,19 +40,23 @@ cd server && npm test
 ### Key Data Flow
 1. User selects character → scene → canvas screen
 2. Dialogue shown with TTS via Web Speech API
-3. Optional: WebSocket connection to server for AI chat (Doubao API)
-4. Optional: RTC connection for video avatar (Volcano Engine)
+3. Optional: WebSocket connection to server for AI chat (Alibaba Bailian Qwen API)
+4. Optional: RTC connection for video avatar (Volcano Engine, optional)
 
 ## Environment Setup
 
 Copy `server/.env.example` to `server/.env` and configure:
 
 ```
-VOLC_APP_ID=your_app_id        # Volcano Engine RTC
-VOLC_APP_KEY=your_app_key
-DOUBAO_API_KEY=your_api_key    # Doubao AI for chat
+DASHSCOPE_API_KEY=sk-xxx       # Alibaba Bailian API Key
+LLM_MODEL=qwen-plus            # Qwen model for chat
+ASR_MODEL=qwen3-asr-flash-realtime  # Real-time ASR
 USE_HTTPS=false                # Set true for HTTPS
 ```
+
+## Alibaba Bailian Setup
+
+See `BAILIAN-SETUP.md` for detailed configuration guide.
 
 ## Extending the App
 

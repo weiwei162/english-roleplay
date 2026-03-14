@@ -1,13 +1,14 @@
 {
   "name": "english-friend-rtc-server",
-  "version": "1.0.0",
-  "description": "English Friend AI - Full-Duplex RTC Server",
+  "version": "2.0.0",
+  "description": "English Friend AI - Alibaba Bailian Edition",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
     "configure": "bash configure.sh",
-    "test": "node test-api.js",
+    "test": "node test-bailian.js",
+    "test:bailian": "node test-bailian.js",
     "test:rtc": "node -e \"require('./test-api.js'); testRTCToken()\"",
     "test:doubao": "node -e \"require('./test-api.js'); testDoubaoAPI()\""
   },
@@ -16,6 +17,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "ws": "^8.14.2",
+    "websocket-client": "^1.0.4",
     "crypto": "^1.0.1"
   },
   "devDependencies": {
@@ -25,8 +27,10 @@
     "node": ">=16.0.0"
   },
   "keywords": [
-    "rtc",
-    "volcengine",
+    "alibaba",
+    "bailian",
+    "qwen",
+    "asr",
     "english-learning",
     "ai-tutor",
     "digital-human"
