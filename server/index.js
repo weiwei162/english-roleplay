@@ -240,6 +240,27 @@ app.post('/api/create-room', async (req, res) => {
     }
 });
 
+// 音频处理配置
+const VAD_CONFIG = {
+    minAudioLength: 10, // 最少音频包数量（约 600ms）
+    maxAudioLength: 50, // 最多音频包数量（约 3 秒）
+    silenceTimeout: 1500, // 静音超时（1.5 秒）
+    volumeThreshold: 50 // 音量阈值（0-255）
+};
+
+// 计算音频音量（RMS）
+function calculateVolume(audioBuffer) {
+    let sum = 0;
+    const length = audioBuffer.length / 2; // 16-bit PCM
+    
+    for (let i = 0; i < length; i++) {
+        const sample = audioBuffer.readInt16LE(i * 2);
+        sum += sample * sample;
+    }
+    
+    return Math.sqrt(sum / length);
+}
+
 // 处理孩子音频（核心对话流程）
 async function handleChildAudio(roomId, audioBuffer, userId) {
     const session = rtcSessions.get(roomId);
@@ -251,51 +272,80 @@ async function handleChildAudio(roomId, audioBuffer, userId) {
     // 更新孩子用户 ID
     session.childUserId = userId;
     
-    // 使用 VAD 检测是否说完一句话（简单实现：累积 1 秒音频）
+    // 初始化音频缓存
     if (!audioBuffers.has(roomId)) {
-        audioBuffers.set(roomId, { buffer: [], lastSpoke: Date.now() });
+        audioBuffers.set(roomId, {
+            buffer: [],
+            lastSpoke: Date.now(),
+            volume: 0,
+            isSpeaking: false
+        });
     }
     
     const cache = audioBuffers.get(roomId);
+    
+    // 计算当前音频音量
+    const volume = calculateVolume(audioBuffer);
+    const isSpeech = volume > VAD_CONFIG.volumeThreshold;
+    
+    // 更新缓存
     cache.buffer.push(audioBuffer);
+    cache.volume = volume;
     cache.lastSpoke = Date.now();
     
-    // 简单 VAD：如果 1 秒内没有新音频，认为说完
-    // 实际应该用更智能的 VAD 算法
-    if (cache.buffer.length > 15) { // 约 1 秒（假设每 60ms 一个包）
-        const mergedBuffer = Buffer.concat(cache.buffer);
-        cache.buffer = []; // 清空缓存
+    // 限制缓存大小
+    if (cache.buffer.length > VAD_CONFIG.maxAudioLength) {
+        cache.buffer.shift(); // 移除最早的包
+    }
+    
+    // VAD 状态机
+    if (isSpeech && !cache.isSpeaking) {
+        // 开始说话
+        cache.isSpeaking = true;
+        console.log(`🗣️ Speech started (volume: ${volume.toFixed(1)})`);
+    } else if (!isSpeech && cache.isSpeaking) {
+        // 检测静音超时
+        const silenceDuration = Date.now() - cache.lastSpoke;
         
-        console.log(`🎤 Processing ${mergedBuffer.length} bytes audio from room ${roomId}`);
-        
-        try {
-            // 1. ASR 识别
-            const text = await recognizeSpeechFromBuffer(mergedBuffer);
+        if (silenceDuration > VAD_CONFIG.silenceTimeout && cache.buffer.length >= VAD_CONFIG.minAudioLength) {
+            // 静音超时，认为说完
+            cache.isSpeaking = false;
             
-            if (!text || text.trim().length === 0) {
-                console.log('⚠️ No speech detected');
-                return;
+            const mergedBuffer = Buffer.concat(cache.buffer);
+            cache.buffer = []; // 清空缓存
+            
+            console.log(`🔇 Speech ended (silence: ${silenceDuration}ms)`);
+            console.log(`🎤 Processing ${mergedBuffer.length} bytes audio from room ${roomId}`);
+            
+            try {
+                // 1. ASR 识别
+                const text = await recognizeSpeechFromBuffer(mergedBuffer);
+                
+                if (!text || text.trim().length === 0) {
+                    console.log('⚠️ No speech detected');
+                    return;
+                }
+                
+                console.log(`📝 Child said: "${text}"`);
+                
+                // 2. 大模型生成回复
+                const reply = await processChildSpeech(text, roomId, session.character);
+                
+                console.log(`🤖 AI reply: "${reply.substring(0, 50)}..."`);
+                
+                // 3. TTS 合成并推送
+                const ttsAudio = await synthesizeSpeech(reply, session.character);
+                
+                console.log(`🔊 TTS generated: ${ttsAudio.length} bytes`);
+                
+                // 4. 发布到 RTC 房间
+                await session.bot.publishAudio(ttsAudio);
+                
+                console.log(`✅ Response sent to room ${roomId}`);
+                
+            } catch (error) {
+                console.error('❌ Error processing audio:', error);
             }
-            
-            console.log(`📝 Child said: "${text}"`);
-            
-            // 2. 大模型生成回复
-            const reply = await processChildSpeech(text, roomId, session.character);
-            
-            console.log(`🤖 AI reply: "${reply.substring(0, 50)}..."`);
-            
-            // 3. TTS 合成并推送
-            const ttsAudio = await synthesizeSpeech(reply, session.character);
-            
-            console.log(`🔊 TTS generated: ${ttsAudio.length} bytes`);
-            
-            // 4. 发布到 RTC 房间
-            await session.bot.publishAudio(ttsAudio);
-            
-            console.log(`✅ Response sent to room ${roomId}`);
-            
-        } catch (error) {
-            console.error('❌ Error processing audio:', error);
         }
     }
 }
@@ -702,18 +752,54 @@ async function recognizeSpeech(audioBase64, sessionId, ws) {
     asr.sendAudio(audioBase64);
 }
 
-// 语音识别（一次性识别 Buffer）
+// 语音识别（一次性识别 Buffer - 百炼 REST API）
 async function recognizeSpeechBuffer(audioBase64) {
-    // 使用百炼 ASR 的 REST API 进行一次性识别
-    // 注意：实时 ASR WebSocket 适合流式，这里用简单方案
+    const apiKey = process.env.DASHSCOPE_API_KEY;
     
-    // TODO: 实现 REST API 调用
-    // 暂时返回模拟结果用于测试
-    console.log('🎤 ASR Buffer:', audioBase64.length, 'bytes');
+    if (!apiKey || apiKey === 'sk-xxx') {
+        console.warn('⚠️ DASHSCOPE_API_KEY not configured');
+        return null;
+    }
     
-    // 模拟识别结果（测试用）
-    // 实际应该调用百炼 ASR REST API
-    return null;
+    try {
+        // 阿里云百炼 ASR REST API
+        // 文档：https://help.aliyun.com/zh/model-studio/
+        const response = await fetch('https://dashscope.aliyuncs.com/api/v1/stt', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                audio: audioBase64,
+                format: 'pcm',
+                sample_rate: 16000,
+                language: 'en-US' // 英语识别
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ ASR API error:', response.status, errorText);
+            return null;
+        }
+        
+        const data = await response.json();
+        
+        // 百炼 ASR 响应格式
+        // { output: { text: "recognized text" }, usage: {...} }
+        const text = data.output?.text || data.text || '';
+        
+        if (text) {
+            console.log('✅ ASR recognized:', text);
+        }
+        
+        return text;
+        
+    } catch (error) {
+        console.error('❌ ASR recognition error:', error.message);
+        return null;
+    }
 }
 
 // 处理孩子说话（核心对话流程）
