@@ -1,5 +1,7 @@
-// 火山 RTC 实时对话式 AI 服务端
-// 架构：RTC 内置 AI + WebSocket 控制 + 百炼备用
+// 火山 RTC 实时对话式 AI 服务端 v2
+// 支持两种模式：
+// 1. 端到端语音大模型（内置 ASR+LLM+TTS）
+// 2. 自定义 ASR+LLM+TTS（百炼 Qwen + Edge TTS）
 
 const express = require('express');
 const cors = require('cors');
@@ -10,7 +12,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const WebSocket = require('websocket');
-const { VolcRTCClient, CHARACTER_PERSONAS } = require('./volc-rtc-client');
+const { VolcRTCClient, CHARACTER_PERSONAS } = require('./volc-rtc-client-v2');
 const { synthesizeSpeech } = require('./tts-client');
 require('dotenv').config();
 
@@ -23,6 +25,9 @@ app.use(express.json());
 const USE_HTTPS = process.env.USE_HTTPS === 'true';
 const HTTPS_PORT = parseInt(process.env.HTTPS_PORT) || 3443;
 const HTTP_PORT = parseInt(process.env.PORT) || 3000;
+
+// AI 模式配置：'end-to-end' 或 'custom'
+const AI_MODE = process.env.AI_MODE || 'end-to-end';
 
 let server;
 let wss;
@@ -77,7 +82,7 @@ wss = new WebSocketServer({ server });
 // 会话存储
 const sessions = new Map();
 
-// RTC 客户端（使用 AccessKey 和 SecretKey）
+// RTC 客户端
 const rtcClient = new VolcRTCClient({
     appId: process.env.VOLC_APP_ID,
     accessKey: process.env.VOLC_ACCESS_KEY,
@@ -89,6 +94,7 @@ const rtcClient = new VolcRTCClient({
 
 const frontendPath = path.join(__dirname, '..');
 console.log('📁 Serving frontend from:', frontendPath);
+console.log(`🤖 AI Mode: ${AI_MODE === 'end-to-end' ? '端到端模式' : '自定义模式'}`);
 
 app.use(express.static(frontendPath, {
     maxAge: '1d',
@@ -96,14 +102,21 @@ app.use(express.static(frontendPath, {
     lastModified: true
 }));
 
+// 服务 uploads 目录（自定义模式用）
+if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
+    fs.mkdirSync(path.join(__dirname, 'uploads'), { recursive: true });
+}
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // 健康检查
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'ok',
         timestamp: new Date().toISOString(),
         services: {
-            rtc: process.env.VOLC_APP_ID && !process.env.VOLC_APP_ID.includes('your_') ? 'configured' : 'not configured',
-            bailian: process.env.DASHSCOPE_API_KEY && !process.env.DASHSCOPE_API_KEY.includes('sk-xxx') ? 'configured' : 'not configured'
+            rtc: process.env.VOLC_ACCESS_KEY ? 'configured' : 'not configured',
+            bailian: process.env.DASHSCOPE_API_KEY ? 'configured' : 'not configured',
+            aiMode: AI_MODE
         },
         activeSessions: sessions.size
     });
@@ -119,37 +132,11 @@ console.log('✅ Frontend configured');
 // ==================== Token 生成 ====================
 
 function generateRTCToken(roomId, uid = 'bot') {
-    const appId = process.env.VOLC_APP_ID;
-    const appKey = process.env.VOLC_APP_KEY;
-    
-    if (!appId || !appKey) {
-        throw new Error('Please set VOLC_APP_ID and VOLC_APP_KEY');
-    }
-    
-    const now = Math.floor(Date.now() / 1000);
-    const expire = now + 3600;
-    
-    const payload = {
-        app_id: appId,
-        room_id: roomId,
-        uid: uid,
-        expire: expire
-    };
-    
-    const signature = crypto
-        .createHmac('sha256', appKey)
-        .update(JSON.stringify(payload))
-        .digest('hex');
-    
-    return Buffer.from(JSON.stringify({
-        ...payload,
-        signature
-    })).toString('base64');
+    return rtcClient.generateToken(roomId, uid);
 }
 
-// ==================== RTC 实时对话式 AI ====================
+// ==================== 创建房间 ====================
 
-// 创建房间并开启 AI 对话
 app.post('/api/create-room', async (req, res) => {
     try {
         const { roomId, character } = req.body;
@@ -163,13 +150,31 @@ app.post('/api/create-room', async (req, res) => {
         // 生成孩子的 Token
         const childToken = rtcClient.generateToken(roomId, 'child');
         
-        // 开启 AI 对话
-        const aiResult = await rtcClient.startVoiceChat({
-            roomId,
-            userId: `ai_${character || 'emma'}`,
-            persona: characterConfig.persona,
-            language: characterConfig.language
-        });
+        let aiResult;
+        
+        if (AI_MODE === 'end-to-end') {
+            // ========== 模式 1：端到端 ==========
+            aiResult = await rtcClient.startVoiceChat({
+                roomId,
+                userId: `ai_${character || 'emma'}`,
+                persona: characterConfig.persona,
+                language: characterConfig.language,
+                enableNoiseReduction: true,
+                enableVAD: true
+            });
+        } else {
+            // ========== 模式 2：自定义 ==========
+            const callbackUrl = `${process.env.PUBLIC_URL || 'http://localhost:3000'}/api/asr-callback`;
+            
+            aiResult = await rtcClient.startVoiceChatCustom({
+                roomId,
+                userId: `ai_${character || 'emma'}`,
+                asrLanguage: 'en-US',
+                callbackUrl: callbackUrl,
+                enableNoiseReduction: true,
+                enableVAD: true
+            });
+        }
         
         console.log(`🏠 Room created: ${roomId}, AI TaskId: ${aiResult.TaskId}`);
         
@@ -177,6 +182,7 @@ app.post('/api/create-room', async (req, res) => {
         sessions.set(roomId, {
             character: character || 'emma',
             aiTaskId: aiResult.TaskId,
+            aiMode: AI_MODE,
             createdAt: Date.now()
         });
         
@@ -185,7 +191,8 @@ app.post('/api/create-room', async (req, res) => {
             token: childToken,
             appId: process.env.VOLC_APP_ID,
             character: character || 'emma',
-            aiTaskId: aiResult.TaskId
+            aiTaskId: aiResult.TaskId,
+            aiMode: AI_MODE
         });
     } catch (error) {
         console.error('❌ Create room error:', error);
@@ -193,7 +200,99 @@ app.post('/api/create-room', async (req, res) => {
     }
 });
 
-// 离开房间
+// ==================== 自定义模式：ASR 回调处理 ====================
+
+app.post('/api/asr-callback', async (req, res) => {
+    const { RoomId, UserId, Text, Status } = req.body;
+    
+    console.log(`📝 [自定义] ASR Callback: Room ${RoomId}, User ${UserId}, Text: ${Text}`);
+    
+    if (Status === 'success' && Text) {
+        await handleChildSpeechCustom(RoomId, Text, UserId);
+    }
+    
+    res.json({ success: true });
+});
+
+// 自定义模式：处理孩子说话（ASR → Qwen → TTS → 推流）
+async function handleChildSpeechCustom(roomId, text, userId) {
+    const session = sessions.get(roomId);
+    if (!session) {
+        console.warn('⚠️ Session not found for room:', roomId);
+        return;
+    }
+    
+    console.log(`📝 [自定义] Child said: "${text}"`);
+    
+    try {
+        // 1. 百炼 Qwen 生成回复
+        const characterConfig = CHARACTER_PERSONAS[session.character];
+        const messages = [
+            { role: 'system', content: characterConfig.persona },
+            { role: 'user', content: text }
+        ];
+        
+        const reply = await callQwenAPI(messages, process.env.LLM_MODEL || 'qwen-plus');
+        console.log(`🤖 [自定义] AI reply: "${reply.substring(0, 50)}..."`);
+        
+        // 2. Edge TTS 合成
+        const ttsAudio = await synthesizeSpeech(reply, session.character);
+        console.log(`🔊 [自定义] TTS generated: ${ttsAudio.length} bytes`);
+        
+        // 3. 保存音频文件
+        const filename = `tts_${Date.now()}.mp3`;
+        const filepath = path.join(__dirname, 'uploads', filename);
+        fs.writeFileSync(filepath, ttsAudio);
+        
+        // 4. 获取可访问 URL
+        const audioUrl = `${process.env.PUBLIC_URL || 'http://localhost:3000'}/uploads/${filename}`;
+        
+        // 5. 推送到 RTC 房间
+        await rtcClient.pushAudioStream({
+            roomId,
+            userId: `ai_${session.character}`,
+            audioUrl: audioUrl,
+            duration: Math.ceil(ttsAudio.length / 16000 / 2) // 估算时长
+        });
+        
+        console.log(`✅ [自定义] Response pushed to room ${roomId}`);
+        
+    } catch (error) {
+        console.error('❌ [自定义] Error processing speech:', error);
+    }
+}
+
+// 百炼 Qwen API 调用
+async function callQwenAPI(messages, model = 'qwen-plus') {
+    const apiKey = process.env.DASHSCOPE_API_KEY;
+    
+    if (!apiKey) {
+        throw new Error('DASHSCOPE_API_KEY not configured');
+    }
+    
+    const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: model,
+            messages: messages
+        })
+    });
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Qwen API error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    return data.choices[0].message.content;
+}
+
+// ==================== 离开房间 ====================
+
 app.post('/api/leave-room', async (req, res) => {
     try {
         const { roomId } = req.body;
@@ -208,36 +307,6 @@ app.post('/api/leave-room', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('❌ Leave room error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 切换角色
-app.post('/api/switch-character', async (req, res) => {
-    try {
-        const { roomId, character } = req.body;
-        
-        const session = sessions.get(roomId);
-        if (!session) {
-            return res.status(404).json({ error: 'Session not found' });
-        }
-        
-        const characterConfig = CHARACTER_PERSONAS[character];
-        
-        // 更新 AI 对话配置
-        await rtcClient.updateVoiceChat(session.aiTaskId, {
-            persona: characterConfig.persona,
-            language: characterConfig.language
-        });
-        
-        session.character = character;
-        sessions.set(roomId, session);
-        
-        console.log(`🔄 Character switched to ${character} in room ${roomId}`);
-        
-        res.json({ success: true, character });
-    } catch (error) {
-        console.error('❌ Switch character error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -277,11 +346,8 @@ wss.on('connection', (ws, req) => {
                     sessions.set(sessionId, { messages: [], ws: ws, character: 'emma' });
                 }
 
-                // 文字模式使用百炼 API（备用）
                 const session = sessions.get(sessionId);
                 console.log(`💬 Text message: "${data.text}"`);
-                
-                // AI 会通过 RTC 自动回复，这里只需记录
                 session.messages.push({ role: 'user', content: data.text });
             }
 
@@ -305,25 +371,26 @@ server.listen(USE_HTTPS ? HTTPS_PORT : HTTP_PORT, () => {
     const protocol = USE_HTTPS ? 'https' : 'http';
     const port = USE_HTTPS ? HTTPS_PORT : HTTP_PORT;
     
-    const rtcConfigured = process.env.VOLC_APP_ID && !process.env.VOLC_APP_ID.includes('your_');
-    const bailianConfigured = process.env.DASHSCOPE_API_KEY && !process.env.DASHSCOPE_API_KEY.includes('sk-xxx');
+    const rtcConfigured = process.env.VOLC_ACCESS_KEY && process.env.VOLC_SECRET_KEY;
+    const bailianConfigured = process.env.DASHSCOPE_API_KEY;
     
     console.log(`
 ╔══════════════════════════════════════════════════════╗
-║    English Friend - RTC Real-time AI Server          ║
+║    English Friend - RTC Real-time AI Server v2       ║
 ║                                                      ║
 ║   🔒 Protocol:  ${USE_HTTPS ? 'HTTPS (Secure)   ' : 'HTTP (Insecure)'}                        ║
 ║   🌐 Frontend:  ${protocol}://localhost:${port}${' '.repeat(33 - protocol.length - String(port).length)}║
 ║   🔌 WebSocket: ${protocol.replace('http', 'ws')}://localhost:${port}${' '.repeat(33 - protocol.length - String(port).length)}║
-║   📡 API:       ${protocol}://localhost:${port}/api${' '.repeat(29 - protocol.length - String(port).length)}║
+║   📡 AI Mode:   ${AI_MODE === 'end-to-end' ? 'End-to-End     ' : 'Custom        '}                       ║
 ║                                                      ║
 ║   🎮 RTC AI:   ${rtcConfigured ? '✅ configured     ' : '❌ not configured'}║
 ║   ☁️ Bailian:  ${bailianConfigured ? '✅ configured     ' : '❌ not configured'}║
 ║                                                      ║
 ║   ✨ Features:                                        ║
-║   ✓ 火山 RTC 实时对话式 AI（内置 ASR+NLP+TTS）          ║
+║   ✓ 火山 RTC 实时对话式 AI                             ║
+║   ✓ 模式 1: 端到端（内置 ASR+LLM+TTS）                 ║
+║   ✓ 模式 2: 自定义（百炼 Qwen + Edge TTS）             ║
 ║   ✓ 5 种角色人设（Emma/Tommy/Lily/Mike/Rose）          ║
-║   ✓ 阿里云百炼备用方案                                ║
 ║   ✓ WebSocket 实时通信                                 ║
 ║   ${USE_HTTPS ? '✓ HTTPS 加密连接' : '  设置 USE_HTTPS=true 启用 HTTPS'}                          ║
 ╚══════════════════════════════════════════════════════╝
@@ -331,5 +398,6 @@ server.listen(USE_HTTPS ? HTTPS_PORT : HTTP_PORT, () => {
 🚀 实时 AI 对话服务已启动！
 📱 浏览器访问：${protocol}://localhost:${port}
 🔑 健康检查：${protocol}://localhost:${port}/health
+🔧 AI 模式：${AI_MODE === 'end-to-end' ? '端到端' : '自定义'}
     `);
 });
