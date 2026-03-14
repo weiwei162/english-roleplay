@@ -1,5 +1,5 @@
-// 火山引擎 RTC 服务端 OpenAPI 客户端
-// 参考文档：https://www.volcengine.com/docs/6348/104482
+// 火山引擎 RTC 实时对话式 AI 客户端
+// 参考文档：https://www.volcengine.com/docs/6348/1310560
 
 const crypto = require('crypto');
 
@@ -7,7 +7,7 @@ class VolcRTCClient {
     constructor(options = {}) {
         this.appId = options.appId;
         this.appKey = options.appKey;
-        this.region = options.region || 'cn-north-1'; // 默认华北区域
+        this.region = options.region || 'cn-north-1';
         this.host = 'rtc.volcengineapi.com';
         this.version = '2021-11-01';
     }
@@ -61,116 +61,75 @@ class VolcRTCClient {
         return data;
     }
 
-    // 开始推流（让服务端"说话"）
-    async startPushStream(roomId, audioUrl, uid = 'server_bot') {
+    // 开启 AI 对话（核心功能）
+    async startVoiceChat(config) {
         try {
-            console.log(`🎙️ Starting push stream to room ${roomId}...`);
+            console.log(`🤖 Starting AI voice chat in room ${config.roomId}...`);
             
-            const result = await this.callAPI('StartPushStream', {}, {
+            const result = await this.callAPI('StartVoiceChat', {}, {
                 AppId: this.appId,
-                RoomId: roomId,
-                UserId: uid,
-                AudioUrl: audioUrl,
-                VideoUrl: '', // 仅音频
-                Duration: 30 // 最大推流时长（秒）
-            });
-            
-            console.log('✅ Push stream started:', result);
-            return result;
-            
-        } catch (error) {
-            console.error('❌ StartPushStream error:', error.message);
-            throw error;
-        }
-    }
-
-    // 开始录制/拉流（让服务端"听"取）
-    async startRecording(roomId, userIds = [], recordType = 'audio') {
-        try {
-            console.log(`📼 Starting recording for room ${roomId}...`);
-            
-            const result = await this.callAPI('StartRecording', {}, {
-                AppId: this.appId,
-                RoomId: roomId,
-                UserIds: userIds, // 指定要录制的用户 ID，空则录制所有人
-                RecordType: recordType, // 'audio' | 'video' | 'both'
-                StorageConfig: {
-                    StorageType: 'tos', // 火山 TOS 存储
-                    Bucket: 'your-bucket',
-                    Path: '/recordings/'
+                RoomId: config.roomId,
+                UserId: config.userId || 'ai_bot',
+                VoiceChatConfig: {
+                    Persona: config.persona || 'Friendly English teacher',
+                    Language: config.language || 'en-US',
+                    // 可选配置
+                    MaxDuration: config.maxDuration || 3600, // 最大时长（秒）
+                    EnableNoiseReduction: config.enableNoiseReduction || true,
+                    EnableVAD: config.enableVAD || true // 语音活动检测
                 }
             });
             
-            console.log('✅ Recording started:', result);
+            console.log('✅ AI voice chat started:', result);
             return result;
             
         } catch (error) {
-            console.error('❌ StartRecording error:', error.message);
+            console.error('❌ StartVoiceChat error:', error.message);
             throw error;
         }
     }
 
-    // 开始云端 ASR
-    async startASR(roomId, userId = '') {
+    // 更新 AI 对话配置
+    async updateVoiceChat(taskId, config) {
         try {
-            console.log(`🎤 Starting ASR for room ${roomId}...`);
+            console.log(`🔄 Updating AI voice chat ${taskId}...`);
             
-            const result = await this.callAPI('StartASR', {}, {
-                AppId: this.appId,
-                RoomId: roomId,
-                UserId: userId, // 空则识别所有人
-                Language: 'zh-CN', // 识别语言
-                CallbackUrl: 'https://your-server.com/asr-callback' // 识别结果回调地址
+            const result = await this.callAPI('UpdateVoiceChat', {}, {
+                TaskId: taskId,
+                VoiceChatConfig: {
+                    Persona: config.persona,
+                    Language: config.language
+                }
             });
             
-            console.log('✅ ASR started:', result);
+            console.log('✅ AI voice chat updated:', result);
             return result;
             
         } catch (error) {
-            console.error('❌ StartASR error:', error.message);
+            console.error('❌ UpdateVoiceChat error:', error.message);
             throw error;
         }
     }
 
-    // 停止推流
-    async stopPushStream(roomId, uid = 'server_bot') {
+    // 结束 AI 对话
+    async stopVoiceChat(taskId) {
         try {
-            console.log(`⏹️ Stopping push stream for room ${roomId}...`);
+            console.log(`⏹️ Stopping AI voice chat ${taskId}...`);
             
-            const result = await this.callAPI('StopPushStream', {}, {
-                AppId: this.appId,
-                RoomId: roomId,
-                UserId: uid
-            });
-            
-            console.log('✅ Push stream stopped:', result);
-            return result;
-            
-        } catch (error) {
-            console.error('❌ StopPushStream error:', error.message);
-            throw error;
-        }
-    }
-
-    // 停止录制
-    async stopRecording(taskId) {
-        try {
-            console.log(`⏹️ Stopping recording task ${taskId}...`);
-            
-            const result = await this.callAPI('StopRecording', {}, {
+            const result = await this.callAPI('StopVoiceChat', {}, {
                 TaskId: taskId
             });
             
-            console.log('✅ Recording stopped:', result);
+            console.log('✅ AI voice chat stopped:', result);
             return result;
             
         } catch (error) {
-            console.error('❌ StopRecording error:', error.message);
+            console.error('❌ StopVoiceChat error:', error.message);
             throw error;
         }
     }
 
-    // 生成 Token（用于客户端加入房间）
+    // 生成客户端 Token（用于前端加入房间）
     generateToken(roomId, uid = 'client', expireSeconds = 3600) {
         const now = Math.floor(Date.now() / 1000);
         const expire = now + expireSeconds;
@@ -194,16 +153,55 @@ class VolcRTCClient {
     }
 }
 
+// 角色人设配置
+const CHARACTER_PERSONAS = {
+    emma: {
+        persona: 'You are Miss Emma, a gentle English teacher for 5-year-old Chinese kids. ' +
+                 'Speak in simple English, use short sentences, encourage them to speak. ' +
+                 'Be warm and patient. Use emojis to make it fun.',
+        language: 'en-US',
+        voice: 'female'
+    },
+    tommy: {
+        persona: 'You are Tommy, a 5-year-old American boy. ' +
+                 'Play with kids and teach them English through games. ' +
+                 'Use simple words and short sentences. Be playful and energetic.',
+        language: 'en-US',
+        voice: 'male'
+    },
+    lily: {
+        persona: 'You are Lily, a 7-year-old lively girl. ' +
+                 'Love singing, drawing, and storytelling. ' +
+                 'Teach English in a warm and encouraging way.',
+        language: 'en-US',
+        voice: 'female'
+    },
+    mike: {
+        persona: 'You are Coach Mike, a sunny sports coach. ' +
+                 'Teach English through sports and activities. ' +
+                 'Be energetic and positive.',
+        language: 'en-US',
+        voice: 'male'
+    },
+    rose: {
+        persona: 'You are Grandma Rose, a kind grandmother. ' +
+                 'Tell stories and teach life lessons. ' +
+                 'Speak slowly and gently with love.',
+        language: 'en-US',
+        voice: 'elderly_female'
+    }
+};
+
 // 测试函数
 async function testRTCClient() {
-    console.log('Testing VolcRTCClient...\n');
+    console.log('Testing VolcRTCClient (Real-time AI)...\n');
     
     const client = new VolcRTCClient({
         appId: process.env.VOLC_APP_ID,
         appKey: process.env.VOLC_APP_KEY
     });
     
-    // 测试生成 Token
+    // 测试 Token 生成
     const token = client.generateToken('test_room', 'test_user');
     console.log('✅ Token generated:', token.substring(0, 50) + '...\n');
     
@@ -214,9 +212,23 @@ async function testRTCClient() {
     }
     
     try {
-        // 测试开始推流
-        // await client.startPushStream('test_room', 'https://example.com/audio.mp3');
+        // 测试开启 AI 对话
+        // const result = await client.startVoiceChat({
+        //     roomId: 'test_room',
+        //     userId: 'ai_emma',
+        //     persona: CHARACTER_PERSONAS.emma.persona,
+        //     language: CHARACTER_PERSONAS.emma.language
+        // });
+        
         console.log('✅ RTC Client initialized successfully\n');
+        console.log('📝 To start AI voice chat, use:');
+        console.log('   await client.startVoiceChat({');
+        console.log('     roomId: "room_123",');
+        console.log('     userId: "ai_emma",');
+        console.log('     persona: "Friendly English teacher",');
+        console.log('     language: "en-US"');
+        console.log('   });\n');
+        
         return true;
     } catch (error) {
         console.error('❌ API test failed:', error.message);
@@ -226,5 +238,6 @@ async function testRTCClient() {
 
 module.exports = {
     VolcRTCClient,
+    CHARACTER_PERSONAS,
     testRTCClient
 };

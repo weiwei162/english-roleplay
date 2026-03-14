@@ -289,8 +289,106 @@ function handleCharacterClick() {
     speak(response.text);
 }
 
-// 选择场景
-function selectScene(sceneId) {
+// ==================== ⭐ RTC AI 语音对话集成 ====================
+
+let rtcAvatarClient = null;
+let currentRoomId = null;
+let currentAiTaskId = null;
+
+// 创建 AI 语音聊天房间
+async function createAIVoiceChatRoom() {
+    if (!currentCharacter || !currentScene) {
+        console.warn('⚠️ Character or scene not selected');
+        return;
+    }
+    
+    console.log('🏠 Creating AI voice chat room...');
+    
+    // 生成房间 ID
+    currentRoomId = `room_${currentCharacter.id}_${currentScene.id}_${Date.now()}`;
+    
+    try {
+        // 1. 调用后端 API 创建房间并开启 AI 对话
+        const response = await fetch('/api/create-room', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                roomId: currentRoomId,
+                character: currentCharacter.id
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        currentAiTaskId = data.aiTaskId;
+        
+        console.log(`✅ AI voice chat room created: ${currentRoomId}, TaskId: ${currentAiTaskId}`);
+        
+        // 2. 初始化 RTC 客户端
+        rtcAvatarClient = initRTCAvatar(data.appId, {
+            asrEnabled: true,
+            onVideoReady: () => {
+                console.log('🎬 RTC video ready');
+            },
+            onError: (error) => {
+                console.error('❌ RTC error:', error);
+            },
+            onLocalAudioPublished: () => {
+                console.log('🎤 Local audio published');
+            }
+        });
+        
+        // 3. 加入 RTC 房间
+        if (rtcAvatarClient) {
+            await rtcAvatarClient.join(currentRoomId, data.token, 'child_' + Date.now(), {
+                publishAudio: true
+            });
+            
+            console.log('✅ Joined RTC room, AI will auto-reply!');
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to create AI voice chat room:', error);
+        throw error;
+    }
+}
+
+// 离开 AI 语音聊天房间
+async function leaveAIVoiceChatRoom() {
+    if (!currentRoomId) return;
+    
+    try {
+        // 1. 离开 RTC 房间
+        if (rtcAvatarClient) {
+            await rtcAvatarClient.leave();
+            rtcAvatarClient = null;
+        }
+        
+        // 2. 调用后端结束 AI 对话
+        if (currentAiTaskId) {
+            await fetch('/api/leave-room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomId: currentRoomId })
+            });
+        }
+        
+        console.log('👋 Left AI voice chat room');
+        
+    } catch (error) {
+        console.error('❌ Failed to leave AI voice chat room:', error);
+    } finally {
+        currentRoomId = null;
+        currentAiTaskId = null;
+    }
+}
+
+// ==================== 选择场景 ====================
+
+async function selectScene(sceneId) {
     currentScene = getScene(sceneId);
     currentDialogueIndex = 0;
     
@@ -312,6 +410,15 @@ function selectScene(sceneId) {
     
     // 清空画布内容
     clearCanvasContent();
+    
+    // ⭐ 新增：创建 RTC 房间并开启 AI 对话
+    try {
+        await createAIVoiceChatRoom();
+    } catch (error) {
+        console.error('❌ Failed to create AI voice chat room:', error);
+        // 降级到本地对话模式
+        console.log('📌 Using local dialogue mode');
+    }
     
     // 开始对话
     setTimeout(() => {

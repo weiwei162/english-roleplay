@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "start:rtc": "node index-rtc-openapi.js",
+    "start:rtc-ai": "node index-rtc-ai.js",
     "dev": "nodemon index.js",
-    "dev:rtc": "nodemon index-rtc-openapi.js",
+    "dev:rtc-ai": "nodemon index-rtc-ai.js",
     "configure": "bash configure.sh",
     "test": "node test-e2e.js",
     "test:e2e": "node test-e2e.js",
