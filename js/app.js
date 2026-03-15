@@ -228,7 +228,17 @@ function speakCurrent() {
 }
 
 // 切换屏幕
-function showScreen(screenId) {
+/**
+ * 切换屏幕
+ * 注意：离开画布界面时需要离开 AI 房间
+ */
+async function showScreen(screenId) {
+    // 如果离开画布界面，离开 AI 房间
+    if (screenId !== 'canvas-screen' && currentRoomId) {
+        console.log('👋 Leaving room when switching screen...');
+        await leaveAIVoiceChatRoom();
+    }
+    
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
     
