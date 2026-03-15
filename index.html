@@ -140,16 +140,16 @@
             
             <!-- 底部交互区 -->
             <div class="interaction-bar">
-                <!-- ⭐ 新增：音频控制栏（RTC 模式） -->
-                <div class="audio-control-bar" id="audio-control-bar" style="display: none;">
+                <!-- ⭐ 音频控制栏（StartVoiceChat 模式） -->
+                <div class="audio-control-bar" id="audio-control-bar">
                     <button id="mute-btn" onclick="toggleMute()" class="control-btn">
-                        🎤 静音
+                        🎤 说话中
                     </button>
                     <div id="audio-level-indicator" class="audio-level">
                         <div class="level-bar"></div>
                     </div>
                     <div id="rtc-status" class="rtc-status">
-                        🟢 连接中...
+                        正在连接 AI...
                     </div>
                 </div>
                 
@@ -183,7 +183,10 @@
     <script src="js/scenes.js"></script>
     <script src="js/conversations.js"></script>
     
-    <!-- ⭐ RTC + WebSocket 模块（按顺序加载） -->
+    <!-- ⭐ StartVoiceChat 客户端（优先） -->
+    <script src="js/startvoicechat-client.js"></script>
+    
+    <!-- RTC + WebSocket 模块（备用） -->
     <script src="js/rtc-client.js"></script>
     <script src="js/websocket-client.js"></script>
     

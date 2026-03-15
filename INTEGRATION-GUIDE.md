@@ -1,341 +1,491 @@
-# 🔗 RTC 实时对话式 AI 集成指南
+# 🔌 StartVoiceChat 前后端集成指南
 
-**版本：** v3.0.0  
 **更新日期：** 2026-03-15  
-**状态：** ✅ 前后端集成完成
+**状态：** ✅ 集成完成
 
 ---
 
-## 📋 完整架构
+## 📋 概述
 
-```
-┌─────────────────┐                          ┌─────────────────┐
-│   孩子浏览器     │                          │  服务端 (Node.js) │
-│                 │                          │                 │
-│  1. 选择角色     │────── HTTP POST ────────▶│  /api/create-room│
-│  2. 选择场景     │                          │                 │
-│                 │                          │  StartVoiceChat  │
-│                 │                          │        │         │
-└────────┬────────┘                          └────────┬────────┘
-         │                                           │
-         │ RTC Token + RoomId                        │ 火山引擎
-         │                                           ▼
-         │                          ┌─────────────────────────┐
-         │                          │   火山引擎 RTC + AI      │
-         │                          │   ┌─────────────────┐   │
-         │◀───── 2. 加入房间 ───────┼──▶│ 虚拟 AI 用户       │   │
-         │                          │   │ ASR + NLP + TTS  │   │
-         │                          │   └─────────────────┘   │
-         │                          └─────────────────────────┘
-         │
-         │ 3. RTC 音频流
-         │    (自动订阅 AI)
-         ▼
-┌─────────────────┐
-│  火山引擎云端    │
-│                 │
-│  AI 自动回复     │
-│  (低延迟)        │
-└─────────────────┘
-```
+本文档说明如何将火山引擎 StartVoiceChat API 与现有前端集成，实现真实的 AI 语音对话功能。
 
 ---
 
-## 🚀 使用流程
+## 🏗️ 架构说明
 
-### 1. 前端：选择角色
-
-```javascript
-// js/app.js
-function selectCharacter(charId) {
-    currentCharacter = getCharacter(charId);
-    // ... 更新 UI
-    showScreen('scene-select');
-}
-```
-
-### 2. 前端：选择场景并创建 AI 房间
-
-```javascript
-async function selectScene(sceneId) {
-    currentScene = getScene(sceneId);
-    
-    // ⭐ 创建 AI 语音聊天房间
-    await createAIVoiceChatRoom();
-    
-    // 开始对话
-    startDialogue();
-}
-```
-
-### 3. 前端：调用后端 API
-
-```javascript
-async function createAIVoiceChatRoom() {
-    // 生成房间 ID
-    currentRoomId = `room_${currentCharacter.id}_${currentScene.id}_${Date.now()}`;
-    
-    // 调用后端 API
-    const response = await fetch('/api/create-room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            roomId: currentRoomId,
-            character: currentCharacter.id
-        })
-    });
-    
-    const data = await response.json();
-    // data.token - RTC Token
-    // data.aiTaskId - AI 对话任务 ID
-    
-    // 加入 RTC 房间
-    rtcAvatarClient.join(currentRoomId, data.token, 'child_' + Date.now());
-}
-```
-
-### 4. 服务端：创建房间并开启 AI
-
-```javascript
-// server/index-rtc-ai.js
-app.post('/api/create-room', async (req, res) => {
-    const { roomId, character } = req.body;
-    
-    // 1. 生成孩子的 Token
-    const childToken = rtcClient.generateToken(roomId, 'child');
-    
-    // 2. 开启 AI 对话
-    const aiResult = await rtcClient.startVoiceChat({
-        roomId,
-        userId: `ai_${character}`,
-        persona: CHARACTER_PERSONAS[character].persona,
-        language: CHARACTER_PERSONAS[character].language
-    });
-    
-    // 3. 返回结果
-    res.json({
-        roomId,
-        token: childToken,
-        aiTaskId: aiResult.TaskId
-    });
-});
-```
-
-### 5. 火山引擎：自动处理
+### 组件结构
 
 ```
-孩子说话
-    │
-    ▼
-RTC 发布音频流
-    │
-    ▼
-火山 AI 云端处理
-    ├─ ASR: 识别语音
-    ├─ NLP: 理解并生成回复
-    └─ TTS: 合成语音
-    │
-    ▼
-AI 发布 TTS 音频流
-    │
-    ▼
-孩子浏览器自动播放
+┌─────────────────────────────────────────────────────┐
+│                     前端 (Browser)                   │
+│  ┌──────────────────────────────────────────────┐   │
+│  │  startvoicechat-client.js                    │   │
+│  │  - StartVoiceChatClient 类                   │   │
+│  │  - 创建/加入房间                              │   │
+│  │  - RTC 引擎管理                               │   │
+│  │  - 视频播放/静音控制                          │   │
+│  └──────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+                        ↕ HTTP/WebSocket
+┌─────────────────────────────────────────────────────┐
+│                   后端 (Node.js)                     │
+│  ┌──────────────────────────────────────────────┐   │
+│  │  volc-start-voicechat.js                     │   │
+│  │  - VolcStartVoiceChatClient 类               │   │
+│  │  - API 签名                                   │   │
+│  │  - StartVoiceChat 调用                        │   │
+│  └──────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────┐   │
+│  │  index-start-voicechat.js                    │   │
+│  │  - REST API (/api/create-room)               │   │
+│  │  - 静态文件服务                               │   │
+│  │  - 会话管理                                   │   │
+│  └──────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+                        ↕ HTTPS
+┌─────────────────────────────────────────────────────┐
+│              火山引擎云服务                           │
+│  - RTC 实时音视频                                    │
+│  - 豆包端到端语音大模型 (S2S)                        │
+│  - ASR 语音识别 + LLM + TTS (分组件模式)             │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📁 关键代码位置
+## 📁 文件结构
 
-### 前端
+### 后端文件
 
-| 文件 | 函数 | 说明 |
-|------|------|------|
-| `js/app.js` | `selectCharacter()` | 选择角色 |
-| `js/app.js` | `selectScene()` | 选择场景并创建 AI 房间 |
-| `js/app.js` | `createAIVoiceChatRoom()` | ⭐ 创建 AI 语音聊天房间 |
-| `js/app.js` | `leaveAIVoiceChatRoom()` | 离开 AI 房间 |
-| `js/rtc-client.js` | `RTCAvatarClient.join()` | 加入 RTC 房间 |
-
-### 服务端
-
-| 文件 | 接口 | 说明 |
-|------|------|------|
-| `server/index-rtc-ai.js` | `POST /api/create-room` | ⭐ 创建房间并开启 AI |
-| `server/index-rtc-ai.js` | `POST /api/leave-room` | 离开房间并结束 AI |
-| `server/index-rtc-ai.js` | `POST /api/switch-character` | 切换角色 |
-| `server/volc-rtc-client.js` | `startVoiceChat()` | ⭐ 调用 StartVoiceChat API |
-
----
-
-## 🔑 API 接口
-
-### 1. 创建房间
-
-```http
-POST /api/create-room
-Content-Type: application/json
-
-{
-  "roomId": "room_123",
-  "character": "emma"
-}
+```
+server/
+├── volc-start-voicechat.js       # StartVoiceChat API 客户端
+├── index-start-voicechat.js      # 服务端入口
+├── test-integration.js           # 集成测试脚本
+└── .env                          # 环境配置
 ```
 
-**响应：**
-```json
-{
-  "roomId": "room_123",
-  "token": "eyJhcHBfaWQiOiIxMjM0NTY3ODkwIi...",
-  "appId": "1234567890",
-  "character": "emma",
-  "aiTaskId": "task_xxx"
-}
+### 前端文件
+
 ```
+js/
+├── startvoicechat-client.js      # StartVoiceChat 前端客户端
+├── app.js                        # 主应用逻辑（已更新）
+└── rtc-client.js                 # 旧版 RTC 客户端（保留）
 
-### 2. 离开房间
-
-```http
-POST /api/leave-room
-Content-Type: application/json
-
-{
-  "roomId": "room_123"
-}
-```
-
-### 3. 切换角色
-
-```http
-POST /api/switch-character
-Content-Type: application/json
-
-{
-  "roomId": "room_123",
-  "character": "tommy"
-}
+index.html                        # 主页面（已更新）
 ```
 
 ---
 
-## 🎭 角色人设
+## 🚀 快速启动
 
-```javascript
-const CHARACTER_PERSONAS = {
-    emma: {
-        persona: '温柔英语老师 Miss Emma',
-        language: 'en-US',
-        voice: 'female'
-    },
-    tommy: {
-        persona: '5 岁美国小男孩 Tommy',
-        language: 'en-US',
-        voice: 'male'
-    },
-    lily: {
-        persona: '7 岁活泼小姐姐 Lily',
-        language: 'en-US',
-        voice: 'female'
-    },
-    mike: {
-        persona: '阳光运动教练 Mike',
-        language: 'en-US',
-        voice: 'male'
-    },
-    rose: {
-        persona: '慈祥老奶奶 Rose',
-        language: 'en-US',
-        voice: 'elderly_female'
-    }
-};
-```
-
----
-
-## ✅ 测试步骤
-
-### 1. 启动服务端
+### 1. 配置环境变量
 
 ```bash
 cd server
-npm run start:rtc-ai
+cp .env.example .env
+```
+
+编辑 `.env`，填入你的凭证：
+
+```env
+# 端到端模式（推荐）
+AI_MODE=s2s
+
+# RTC 配置
+VOLC_APP_ID=你的 RTC AppId
+VOLC_APP_KEY=你的 RTC AppKey
+VOLC_ACCESS_KEY=你的 AccessKey
+VOLC_SECRET_KEY=你的 SecretKey
+
+# S2S 配置
+VOLC_S2S_APP_ID=你的 S2S AppId
+VOLC_S2S_TOKEN=你的 S2S Token
+```
+
+### 2. 启动服务
+
+```bash
+node index-start-voicechat.js
+```
+
+### 3. 运行集成测试
+
+```bash
+node test-integration.js
 ```
 
 **预期输出：**
+
 ```
-╔══════════════════════════════════════════════════════╗
-║    English Friend - RTC Real-time AI Server          ║
-║                                                      ║
-║   🎮 RTC AI:   ✅ configured                          ║
-║   ☁️ Bailian:  ✅ configured                          ║
-║                                                      ║
-║   ✨ Features:                                        ║
-║   ✓ 火山 RTC 实时对话式 AI（内置 ASR+NLP+TTS）          ║
-║   ✓ 5 种角色人设（Emma/Tommy/Lily/Mike/Rose）          ║
-╚══════════════════════════════════════════════════════╝
+🧪 StartVoiceChat 前后端集成测试
+
+📋 测试 1: 健康检查
+✅ 健康检查通过
+
+📋 测试 2: 获取角色列表
+✅ 角色列表获取成功
+
+📋 测试 3: 创建 AI 房间
+✅ 房间创建成功
+
+📋 测试 4: 离开房间
+✅ 房间离开成功
+
+📋 测试 5: 前端静态文件
+✅ 前端页面可访问
+
+📋 测试 6: StartVoiceChat 客户端 JS
+✅ StartVoiceChat 客户端 JS 可访问
+
+🎉 所有测试通过！前后端集成完成！
 ```
 
-### 2. 浏览器访问
+### 4. 浏览器访问
 
 ```
 http://localhost:3000
 ```
 
-### 3. 测试流程
+---
 
-1. **选择角色** → 点击 Miss Emma
-2. **选择场景** → 点击魔法动物园
-3. **等待 AI 初始化** → 控制台显示 `✅ AI voice chat room created`
-4. **说话测试** → 点击麦克风说 "Hello Miss Emma!"
-5. **听 AI 回复** → 自动播放 "Hi! Great to see you!"
+## 🔧 前端集成详解
+
+### 1. 加载 StartVoiceChat 客户端
+
+在 `index.html` 中：
+
+```html
+<!-- StartVoiceChat 客户端（优先） -->
+<script src="js/startvoicechat-client.js"></script>
+
+<!-- RTC + WebSocket 模块（备用） -->
+<script src="js/rtc-client.js"></script>
+<script src="js/websocket-client.js"></script>
+
+<!-- 主应用 -->
+<script src="js/app.js"></script>
+```
+
+### 2. 创建房间流程
+
+在 `app.js` 中：
+
+```javascript
+async function createAIVoiceChatRoom() {
+    // 生成房间 ID
+    currentRoomId = `room_${currentCharacter.id}_${Date.now()}`;
+    
+    // 显示加载动画
+    showVideoLoading();
+    
+    // 创建并加入房间
+    await createStartVoiceChatRoom(
+        currentRoomId,
+        currentCharacter.id,
+        {
+            onReady: (info) => {
+                console.log('✅ AI voice chat ready');
+                hideVideoLoading();
+            },
+            onError: (error) => {
+                console.error('❌ Voice chat error:', error);
+                showVideoError(error.message);
+            },
+            onStatusChange: (status, text) => {
+                updateRTCStatus(status, text);
+            }
+        }
+    );
+}
+```
+
+### 3. 离开房间
+
+```javascript
+async function leaveAIVoiceChatRoom() {
+    if (!currentRoomId) return;
+    
+    // 离开 StartVoiceChat 房间
+    await leaveStartVoiceChatRoom();
+    
+    currentRoomId = null;
+}
+```
+
+### 4. UI 控制
+
+```javascript
+// 切换视频模式
+function toggleVideoMode() {
+    if (window.currentVoiceChat) {
+        const isActive = document.getElementById('rtc-video-layer')
+            .classList.contains('active');
+        window.currentVoiceChat.showVideo(!isActive);
+    }
+}
+
+// 切换静音
+function toggleMute() {
+    const isMuted = document.getElementById('mute-btn')
+        .classList.contains('muted');
+    
+    if (window.currentVoiceChat) {
+        window.currentVoiceChat.muteLocalAudio(!isMuted);
+    }
+    
+    // 更新 UI
+    const muteBtn = document.getElementById('mute-btn');
+    muteBtn.classList.toggle('muted');
+    muteBtn.innerHTML = isMuted ? '🎤 说话中' : '🔇 已静音';
+}
+```
 
 ---
 
-## 🐛 故障排查
+## 🎭 角色配置
 
-### Q1: 创建房间失败
+系统预置 5 种角色，在 `volc-start-voicechat.js` 中配置：
 
-```bash
-# 检查服务端日志
-tail -f server/logs/*.log
-
-# 检查 .env 配置
-cat .env | grep VOLC
-```
-
-### Q2: RTC 加入失败
-
-```bash
-# 检查 Token 是否正确
-# 检查 RTC SDK 是否加载
-# 查看浏览器控制台错误
-```
-
-### Q3: AI 不回复
-
-```bash
-# 检查 StartVoiceChat 是否成功
-# 检查 AI TaskId 是否正确
-# 查看服务端日志
+```javascript
+const CHARACTER_CONFIGS = {
+    emma: {
+        name: 'Miss Emma',
+        systemPrompt: 'You are Miss Emma, a gentle English teacher...',
+        systemRole: 'You are Miss Emma, a gentle English teacher.',
+        speakingStyle: 'Warm, patient, encouraging',
+        ttsVoiceType: 'zh_female_linjianvhai_moon_bigtts',
+        s2sSpeaker: 'zh_female_vv_jupiter_bigtts'
+    },
+    // ... 其他角色
+};
 ```
 
 ---
 
-## 📊 性能指标
+## 📊 API 接口
 
-| 指标 | 目标值 | 实测值 |
-|------|--------|--------|
-| 延迟 | < 2 秒 | 待测试 |
-| 识别准确率 | > 90% | 待测试 |
-| 并发支持 | > 100 | 待测试 |
+### POST /api/create-room
+
+创建 AI 语音聊天房间。
+
+**请求：**
+
+```json
+{
+  "roomId": "room123",
+  "character": "emma"
+}
+```
+
+**响应：**
+
+```json
+{
+  "roomId": "room123",
+  "token": "eyJhcHBfaWQiOiJ4eHgiLCJyb29tX2lkIjoicm9vbTEyMyIs...",
+  "appId": "your_app_id",
+  "character": "emma",
+  "characterName": "Miss Emma",
+  "taskId": "task_room123_1710576000000",
+  "aiMode": "s2s",
+  "success": true
+}
+```
+
+### POST /api/leave-room
+
+离开 AI 语音聊天房间。
+
+**请求：**
+
+```json
+{
+  "roomId": "room123"
+}
+```
+
+### GET /api/characters
+
+获取角色列表。
+
+**响应：**
+
+```json
+{
+  "characters": [
+    {
+      "id": "emma",
+      "name": "Miss Emma",
+      "description": "You are Miss Emma, a gentle English teacher..."
+    },
+    // ...
+  ]
+}
+```
+
+### GET /health
+
+健康检查。
+
+**响应：**
+
+```json
+{
+  "status": "ok",
+  "config": {
+    "aiMode": "s2s",
+    "volcConfigured": true,
+    "rtcConfigured": true
+  },
+  "activeSessions": 0
+}
+```
+
+---
+
+## 🎨 UI 组件
+
+### 视频层
+
+```html
+<div class="rtc-video-layer" id="rtc-video-layer">
+    <div class="video-container" id="avatar-video-container">
+        <!-- 火山 RTC 视频将播放在这里 -->
+    </div>
+    <button class="toggle-video-btn" onclick="toggleVideoMode()">
+        📹 切换动画模式
+    </button>
+</div>
+```
+
+### 音频控制栏
+
+```html
+<div class="audio-control-bar" id="audio-control-bar">
+    <button id="mute-btn" onclick="toggleMute()" class="control-btn">
+        🎤 说话中
+    </button>
+    <div id="audio-level-indicator" class="audio-level">
+        <div class="level-bar"></div>
+    </div>
+    <div id="rtc-status" class="rtc-status">
+        正在连接 AI...
+    </div>
+</div>
+```
+
+---
+
+## 🐛 调试技巧
+
+### 1. 查看日志
+
+```bash
+# 启动时查看详细日志
+DEBUG=* node index-start-voicechat.js
+```
+
+### 2. 浏览器控制台
+
+打开浏览器开发者工具，查看：
+
+- StartVoiceChat 客户端日志
+- RTC 连接状态
+- 错误信息
+
+### 3. 网络请求
+
+检查 Network 面板：
+
+- `/api/create-room` - 创建房间请求
+- `/api/leave-room` - 离开房间请求
+- `/health` - 健康检查
+
+### 4. 测试工具
+
+```bash
+# 健康检查
+curl http://localhost:3000/health
+
+# 获取角色列表
+curl http://localhost:3000/api/characters
+
+# 创建房间
+curl -X POST http://localhost:3000/api/create-room \
+  -H "Content-Type: application/json" \
+  -d '{"roomId":"test1","character":"emma"}'
+
+# 离开房间
+curl -X POST http://localhost:3000/api/leave-room \
+  -H "Content-Type: application/json" \
+  -d '{"roomId":"test1"}'
+```
+
+---
+
+## ⚠️ 常见问题
+
+### Q1: RTC SDK 加载失败
+
+```
+解决：
+- 检查网络连接
+- 确认 CDN 地址可访问
+- 使用备用方案（动画模式）
+```
+
+### Q2: 创建房间失败
+
+```
+解决：
+- 检查环境变量配置
+- 确认 API 凭证正确
+- 查看服务端日志
+```
+
+### Q3: AI 未入房
+
+```
+解决：
+- StartVoiceChat 返回 200 仅代表任务下发
+- 前往控制台开启 VoiceChat 事件回调
+- 等待 AI 自动加入（通常 3-5 秒）
+```
+
+### Q4: 视频不显示
+
+```
+解决：
+- 检查远端用户是否发布视频流
+- 确认视频容器存在
+- 切换动画模式查看是否降级
+```
 
 ---
 
 ## 📚 参考文档
 
-- [火山 RTC 实时对话式 AI](https://www.volcengine.com/docs/6348/1310560)
-- [StartVoiceChat API](https://www.volcengine.com/docs/6348/1558163)
-- [StopVoiceChat API](https://www.volcengine.com/docs/6348/2123310)
+- **StartVoiceChat API:** https://www.volcengine.com/docs/6348/1558163
+- **RTC Web SDK:** https://www.volcengine.com/docs/6348/75707
+- **调用方法:** https://www.volcengine.com/docs/6348/1899868
 
 ---
 
-**集成完成！开始测试吧！** 🎉
+## ✅ 集成检查清单
+
+- [ ] 配置环境变量
+- [ ] 启动后端服务
+- [ ] 运行集成测试
+- [ ] 所有测试通过
+- [ ] 浏览器访问前端
+- [ ] 选择角色和场景
+- [ ] 视频播放正常
+- [ ] 音频双向传输正常
+- [ ] 静音控制正常
+- [ ] 离开房间正常
+
+---
+
+**集成完成！开始享受真实的 AI 语音对话吧！** 🐾

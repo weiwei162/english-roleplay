@@ -289,70 +289,57 @@ function handleCharacterClick() {
     speak(response.text);
 }
 
-// ==================== ⭐ RTC AI 语音对话集成 ====================
+// ==================== ⭐ StartVoiceChat AI 语音对话集成 ====================
 
-let rtcAvatarClient = null;
 let currentRoomId = null;
 let currentAiTaskId = null;
+let isStartVoiceChatMode = true; // 使用 StartVoiceChat API
 
-// 创建 AI 语音聊天房间
+// 创建 AI 语音聊天房间（使用 StartVoiceChat API）
 async function createAIVoiceChatRoom() {
     if (!currentCharacter || !currentScene) {
         console.warn('⚠️ Character or scene not selected');
         return;
     }
     
-    console.log('🏠 Creating AI voice chat room...');
+    console.log('🏠 Creating StartVoiceChat room...');
     
     // 生成房间 ID
     currentRoomId = `room_${currentCharacter.id}_${currentScene.id}_${Date.now()}`;
     
     try {
-        // 1. 调用后端 API 创建房间并开启 AI 对话
-        const response = await fetch('/api/create-room', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                roomId: currentRoomId,
-                character: currentCharacter.id
-            })
-        });
+        // 显示加载动画
+        showVideoLoading();
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
-        currentAiTaskId = data.aiTaskId;
-        
-        console.log(`✅ AI voice chat room created: ${currentRoomId}, TaskId: ${currentAiTaskId}`);
-        
-        // 2. 初始化 RTC 客户端
-        rtcAvatarClient = initRTCAvatar(data.appId, {
-            asrEnabled: true,
-            onVideoReady: () => {
-                console.log('🎬 RTC video ready');
-            },
-            onError: (error) => {
-                console.error('❌ RTC error:', error);
-            },
-            onLocalAudioPublished: () => {
-                console.log('🎤 Local audio published');
+        // 使用 StartVoiceChat 客户端创建房间
+        await createStartVoiceChatRoom(
+            currentRoomId,
+            currentCharacter.id,
+            {
+                onReady: (info) => {
+                    console.log('✅ AI voice chat ready:', info);
+                    currentAiTaskId = info.taskId;
+                    hideVideoLoading();
+                    updateRTCStatus('connected', 'AI 角色已就绪');
+                },
+                onError: (error) => {
+                    console.error('❌ Voice chat error:', error);
+                    showVideoError(error.message);
+                    updateRTCStatus('error', '连接失败');
+                },
+                onStatusChange: (status, text) => {
+                    updateRTCStatus(status, text);
+                }
             }
-        });
+        );
         
-        // 3. 加入 RTC 房间
-        if (rtcAvatarClient) {
-            await rtcAvatarClient.join(currentRoomId, data.token, 'child_' + Date.now(), {
-                publishAudio: true
-            });
-            
-            console.log('✅ Joined RTC room, AI will auto-reply!');
-        }
+        console.log('✅ StartVoiceChat room created and joined');
         
     } catch (error) {
-        console.error('❌ Failed to create AI voice chat room:', error);
-        throw error;
+        console.error('❌ Failed to create StartVoiceChat room:', error);
+        // 降级到本地对话模式
+        console.log('📌 Using local dialogue mode');
+        isStartVoiceChatMode = false;
     }
 }
 
@@ -361,28 +348,17 @@ async function leaveAIVoiceChatRoom() {
     if (!currentRoomId) return;
     
     try {
-        // 1. 离开 RTC 房间
-        if (rtcAvatarClient) {
-            await rtcAvatarClient.leave();
-            rtcAvatarClient = null;
-        }
+        // 离开 StartVoiceChat 房间
+        await leaveStartVoiceChatRoom();
         
-        // 2. 调用后端结束 AI 对话
-        if (currentAiTaskId) {
-            await fetch('/api/leave-room', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomId: currentRoomId })
-            });
-        }
-        
-        console.log('👋 Left AI voice chat room');
+        console.log('👋 Left StartVoiceChat room');
         
     } catch (error) {
-        console.error('❌ Failed to leave AI voice chat room:', error);
+        console.error('❌ Failed to leave room:', error);
     } finally {
         currentRoomId = null;
         currentAiTaskId = null;
+        isStartVoiceChatMode = true;
     }
 }
 
