@@ -232,8 +232,15 @@ class VolcStartVoiceChatClient {
 
     /**
      * 生成 RTC Token（用于客户端加入房间）
+     * 
+     * 参考官方文档：https://www.volcengine.com/docs/6348/70114
+     * 
+     * @param {string} roomId - 房间 ID
+     * @param {string} uid - 用户 ID
+     * @param {number} expireSeconds - 有效期（秒），默认 24 小时
+     * @returns {string} Base64 编码的 Token
      */
-    generateToken(roomId, uid = 'client', expireSeconds = 3600) {
+    generateToken(roomId, uid = 'client', expireSeconds = 86400) { // 默认 24 小时
         const appId = process.env.VOLC_APP_ID;
         const appKey = process.env.VOLC_APP_KEY;
         
@@ -243,21 +250,51 @@ class VolcStartVoiceChatClient {
         
         const now = Math.floor(Date.now() / 1000);
         const expire = now + expireSeconds;
+        
+        // Token payload
         const payload = {
             app_id: appId,
             room_id: roomId,
             uid: uid,
-            expire: expire
+            expire: expire,
+            // 权限配置（至少需要一个权限才能进房）
+            permissions: {
+                // 订阅流权限（接收音视频）
+                subscribe_stream: true,
+                // 发布流权限（发送音视频）
+                publish_stream: true,
+                // 订阅消息权限
+                subscribe_message: true,
+                // 发布消息权限
+                publish_message: true
+            }
         };
         
+        // 生成签名
         const signature = crypto.createHmac('sha256', appKey)
             .update(JSON.stringify(payload))
             .digest('hex');
         
-        return Buffer.from(JSON.stringify({
+        // 组合 Token
+        const token = {
             ...payload,
             signature
-        })).toString('base64');
+        };
+        
+        // Base64 编码
+        return Buffer.from(JSON.stringify(token)).toString('base64');
+    }
+
+    /**
+     * 生成通配 Token（可以加入任意房间）
+     * 
+     * @param {string} uid - 用户 ID
+     * @param {number} expireSeconds - 有效期（秒）
+     * @returns {string} Base64 编码的通配 Token
+     */
+    generateWildcardToken(uid, expireSeconds = 86400) {
+        // 通配 Token 使用 "*" 作为 roomId
+        return this.generateToken('*', uid, expireSeconds);
     }
 }
 

@@ -232,23 +232,32 @@ class StartVoiceChatClient {
             // 创建引擎
             this.engine = window.VERTC.createEngine(this.appId);
             
-            // 设置日志级别
-            this.engine.setLogLevel(window.VERTC.LogLevel.Info);
+            // 设置日志级别（安全检查）
+            if (window.VERTC.LogLevel && window.VERTC.LogLevel.Info) {
+                this.engine.setLogLevel(window.VERTC.LogLevel.Info);
+            } else {
+                console.log('⚠️ LogLevel not available, using default');
+            }
             
             // 监听事件
             this.setupEventListeners();
+            
+            // 准备房间配置（安全检查）
+            const roomConfig = {
+                isAutoPublish: true, // 自动发布本地流
+                isAutoSubscribeAudio: true, // 自动订阅音频
+                isAutoSubscribeVideo: true, // 自动订阅视频
+                roomProfileType: window.VERTC.RoomProfileType 
+                    ? window.VERTC.RoomProfileType.communication 
+                    : 0 // 降级：使用默认值
+            };
             
             // 加入房间
             await this.engine.joinRoom(
                 token,
                 this.roomId,
                 { userId: this.localUserId },
-                {
-                    isAutoPublish: true, // 自动发布本地流
-                    isAutoSubscribeAudio: true, // 自动订阅音频
-                    isAutoSubscribeVideo: true, // 自动订阅视频
-                    roomProfileType: window.VERTC.RoomProfileType.communication
-                }
+                roomConfig
             );
             
             console.log('✅ Joined RTC room:', this.roomId);
@@ -292,8 +301,11 @@ class StartVoiceChatClient {
     setupEventListeners() {
         if (!this.engine) return;
         
+        // 安全检查：确保 VERTC.events 存在
+        const events = window.VERTC.events || {};
+        
         // 用户加入
-        this.engine.on(window.VERTC.events.onUserJoin, (e) => {
+        this.engine.on(events.onUserJoin || 'onUserJoin', (e) => {
             console.log('👤 User joined:', e.userId);
             
             // 如果是 AI 角色加入
@@ -303,7 +315,7 @@ class StartVoiceChatClient {
         });
         
         // 用户发布流
-        this.engine.on(window.VERTC.events.onUserPublishStream, async (e) => {
+        this.engine.on(events.onUserPublishStream || 'onUserPublishStream', async (e) => {
             const { userId, mediaType } = e;
             console.log('📥 User published stream:', userId, mediaType);
             
@@ -335,13 +347,13 @@ class StartVoiceChatClient {
         });
         
         // 用户取消发布
-        this.engine.on(window.VERTC.events.onUserUnPublishStream, (e) => {
+        this.engine.on(events.onUserUnPublishStream || 'onUserUnPublishStream', (e) => {
             console.log('📴 User unpublished stream:', e.userId);
             this.remoteUsers.delete(e.userId);
         });
         
         // 用户离开
-        this.engine.on(window.VERTC.events.onUserLeave, (e) => {
+        this.engine.on(events.onUserLeave || 'onUserLeave', (e) => {
             console.log('👋 User left:', e.userId);
             this.remoteUsers.delete(e.userId);
             
@@ -353,14 +365,14 @@ class StartVoiceChatClient {
         });
         
         // 错误处理
-        this.engine.on(window.VERTC.events.onError, (e) => {
+        this.engine.on(events.onError || 'onError', (e) => {
             console.error('❌ RTC Error:', e.code, e.message);
             this.onStatusChange('error', `错误：${e.message}`);
             this.onError(new Error(e.message));
         });
         
         // 音频数据（可选：用于音量检测）
-        this.engine.on(window.VERTC.events.onAudioData, (e) => {
+        this.engine.on(events.onAudioData || 'onAudioData', (e) => {
             // 可以在这里处理接收到的音频数据
             // console.log('🎵 Audio data from', e.userId, ':', e.data.byteLength, 'bytes');
         });
@@ -377,8 +389,12 @@ class StartVoiceChatClient {
         }
         
         try {
+            const StreamIndex = window.VERTC.StreamIndex 
+                ? window.VERTC.StreamIndex.STREAM_INDEX_MAIN 
+                : 0; // 降级：使用默认值
+            
             this.engine.setRemoteVideoPlayer(
-                window.VERTC.StreamIndex.STREAM_INDEX_MAIN,
+                StreamIndex,
                 {
                     userId: userId,
                     renderDom: player
@@ -431,7 +447,9 @@ class StartVoiceChatClient {
             
             // 3. 销毁引擎
             if (this.engine) {
-                window.VERTC.destroyEngine(this.engine);
+                if (window.VERTC.destroyEngine) {
+                    window.VERTC.destroyEngine(this.engine);
+                }
                 this.engine = null;
                 console.log('✅ Engine destroyed');
             }

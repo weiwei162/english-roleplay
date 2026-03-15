@@ -13,6 +13,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, CHARACTER_CONFIGS } = require('./volc-start-voicechat');
+const { generateToken, generateWildcardToken } = require('./token-generator');
 require('dotenv').config();
 
 const app = express();
@@ -85,25 +86,54 @@ app.get('/api/config', (req, res) => {
 
 app.get('/api/token', (req, res) => {
     try {
-        const { roomId, uid } = req.query;
+        const { roomId, uid, wildcard } = req.query;
         
-        if (!roomId || !uid) {
+        if (!uid) {
             return res.status(400).json({ 
-                error: 'roomId and uid are required',
+                error: 'uid is required',
                 success: false
             });
         }
         
-        // 生成 Token（1 小时有效期）
-        const token = client.generateToken(roomId, uid, 3600);
+        // 通配 Token 或普通 Token
+        let token;
+        let targetRoomId = roomId || '*';
+        
+        if (wildcard === 'true') {
+            // 生成通配 Token（可以加入任意房间）
+            token = generateWildcardToken(
+                process.env.VOLC_APP_ID,
+                process.env.VOLC_APP_KEY,
+                uid,
+                86400 // 24 小时
+            );
+            console.log('🔑 Generated wildcard token for:', uid);
+        } else {
+            // 生成普通 Token（只能加入指定房间）
+            if (!roomId) {
+                return res.status(400).json({
+                    error: 'roomId is required (or use wildcard=true)',
+                    success: false
+                });
+            }
+            token = generateToken(
+                process.env.VOLC_APP_ID,
+                process.env.VOLC_APP_KEY,
+                roomId,
+                uid,
+                86400 // 24 小时
+            );
+            console.log('🔑 Generated token for:', { roomId, uid });
+        }
         
         res.json({
             success: true,
-            roomId,
+            roomId: targetRoomId,
             uid,
             token,
             appId: process.env.VOLC_APP_ID,
-            expireIn: 3600
+            expireIn: 86400, // 24 小时
+            wildcard: wildcard === 'true'
         });
     } catch (error) {
         console.error('❌ Generate token error:', error);
