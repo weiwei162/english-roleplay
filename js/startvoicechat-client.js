@@ -458,12 +458,14 @@ class StartVoiceChatClient {
             }
             
             // 3. 销毁引擎
-            if (this.engine) {
-                if (window.VERTC.destroyEngine) {
-                    window.VERTC.destroyEngine(this.engine);
-                }
+            if (this.engine && window.VERTC && window.VERTC.destroyEngine) {
+                window.VERTC.destroyEngine(this.engine);
                 this.engine = null;
                 console.log('✅ Engine destroyed');
+            } else if (this.engine) {
+                // 如果 VERTC 不可用，至少清空 engine 引用
+                this.engine = null;
+                console.log('⚠️ Engine reference cleared (VERTC not available)');
             }
             
             this.remoteUsers.clear();
