@@ -956,9 +956,40 @@ function waitForRTCSdk() {
     });
 }
 
+// ==================== 页面生命周期管理 ====================
+
+// 页面可见性变化
 document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
         speechSynthesis.cancel();
+    }
+});
+
+// 页面刷新或关闭前
+window.addEventListener('beforeunload', async function(event) {
+    if (currentRoomId) {
+        console.log('👋 Page closing, leaving room...');
+        
+        // 同步离开房间（beforeunload 中只能做同步操作）
+        try {
+            // 使用 sendBeacon 发送离开请求（可靠，即使页面关闭）
+            const data = JSON.stringify({ roomId: currentRoomId, taskId: currentAiTaskId });
+            navigator.sendBeacon('/api/leave-room', data);
+            console.log('✅ Leave request sent via sendBeacon');
+        } catch (error) {
+            console.error('❌ Failed to send leave request:', error);
+        }
+    }
+});
+
+// 页面隐藏时（用户切换标签页或最小化）
+document.addEventListener('visibilitychange', async function() {
+    if (document.hidden) {
+        console.log('🌙 Page hidden, muting audio...');
+        // 可选：静音或暂停
+    } else {
+        console.log('☀️ Page visible, resuming...');
+        // 可选：恢复
     }
 });
 
