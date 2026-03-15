@@ -339,13 +339,11 @@ async function createAIVoiceChatRoom() {
         
         // 步骤 1: 前端创建 RTC 房间并加入
         // 使用 StartVoiceChat 客户端（正确流程版本）
-        // 注意：AppId 可以从后端 API 获取，或硬编码在前端配置中
-        const VOLC_APP_ID = window.VOLC_APP_ID || 'YOUR_APP_ID'; // 从全局配置获取
-        
+        // 注意：AppId 和 Token 都从后端 API 获取（推荐方式）
         await createStartVoiceChatRoom(
             currentRoomId,
-            VOLC_APP_ID,
             {
+                fetchConfig: true, // 从后端获取配置（推荐）
                 // 房间创建成功回调
                 onReady: () => {
                     console.log('✅ [1/4] Room created and joined');

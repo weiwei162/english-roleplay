@@ -9,9 +9,8 @@
     <!-- 参考文档：https://www.volcengine.com/docs/6348/75707 -->
     <script>
         // ==================== 火山引擎 RTC 配置 ====================
-        // 在这里配置你的 RTC AppId
-        // 或者从后端 API 获取（推荐）
-        window.VOLC_APP_ID = 'YOUR_APP_ID'; // ⚠️ 替换为你的 RTC AppId
+        // 注意：AppId 现在从后端 API 获取（/api/config）
+        // 不需要在前端硬编码，提高安全性
         
         // 动态加载 RTC SDK，失败时优雅降级
         (function() {

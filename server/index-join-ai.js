@@ -62,6 +62,58 @@ app.get('/health', (req, res) => {
     });
 });
 
+// ==================== ⭐ 获取前端配置（新接口） ====================
+
+app.get('/api/config', (req, res) => {
+    // 返回前端需要的配置信息
+    res.json({
+        success: true,
+        config: {
+            appId: process.env.VOLC_APP_ID,
+            // 可以添加其他前端需要的配置
+            aiMode: AI_MODE,
+            features: {
+                enableVideo: true,
+                enableASR: true,
+                enableTTS: true
+            }
+        }
+    });
+});
+
+// ==================== ⭐ 获取 RTC Token（新接口） ====================
+
+app.get('/api/token', (req, res) => {
+    try {
+        const { roomId, uid } = req.query;
+        
+        if (!roomId || !uid) {
+            return res.status(400).json({ 
+                error: 'roomId and uid are required',
+                success: false
+            });
+        }
+        
+        // 生成 Token（1 小时有效期）
+        const token = client.generateToken(roomId, uid, 3600);
+        
+        res.json({
+            success: true,
+            roomId,
+            uid,
+            token,
+            appId: process.env.VOLC_APP_ID,
+            expireIn: 3600
+        });
+    } catch (error) {
+        console.error('❌ Generate token error:', error);
+        res.status(500).json({ 
+            error: error.message,
+            success: false
+        });
+    }
+});
+
 // ==================== ⭐ AI 加入房间（新接口） ====================
 
 app.post('/api/join-ai', async (req, res) => {

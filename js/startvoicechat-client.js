@@ -35,32 +35,41 @@ class StartVoiceChatClient {
      * 步骤 1: 创建 RTC 房间（前端创建）
      * 
      * @param {string} roomId - 房间 ID（前端生成）
-     * @param {string} appId - RTC AppId（前端配置）
+     * @param {Object} options - 可选配置
+     * @param {string} options.appId - RTC AppId（可选，从后端获取）
+     * @param {boolean} options.fetchConfig - 是否从后端获取配置（默认 true）
      */
-    async createRoom(roomId, appId) {
-        console.log('🏠 [1/5] Creating RTC room (frontend)...', { roomId, appId });
+    async createRoom(roomId, options = {}) {
+        console.log('🏠 [1/5] Creating RTC room (frontend)...', { roomId });
         
         try {
             this.roomId = roomId;
-            this.appId = appId || this.appId;
             
-            if (!this.appId) {
-                throw new Error('AppId is required');
+            // 步骤 1: 从后端获取配置（推荐方式）
+            if (options.fetchConfig !== false) {
+                await this.fetchConfig();
             }
             
-            // 初始化 RTC 引擎
+            // 使用传入的 AppId 或从配置获取
+            this.appId = options.appId || this.appId;
+            
+            if (!this.appId) {
+                throw new Error('AppId is required. Provide it or ensure /api/config is configured.');
+            }
+            
+            // 步骤 2: 初始化 RTC 引擎
             await this.initRTC();
             
-            // 生成用户 ID
+            // 步骤 3: 生成用户 ID
             this.localUserId = `child_${Date.now()}`;
             
-            // 创建 Token（前端生成，或使用后端 API）
-            const token = this.generateToken(this.roomId, this.localUserId);
+            // 步骤 4: 从后端获取 Token（推荐方式）
+            const token = await this.fetchToken(this.roomId, this.localUserId);
             
-            // 加入房间
+            // 步骤 5: 加入房间
             await this.joinRoom(token);
             
-            // 开启本地音视频采集
+            // 步骤 6: 开启本地音视频采集
             await this.startLocalCapture();
             
             this.isRoomCreated = true;
@@ -68,12 +77,70 @@ class StartVoiceChatClient {
             console.log('✅ [1/5] RTC room created and joined');
             this.onStatusChange('room_created', '房间已创建');
             
-            return { roomId: this.roomId, userId: this.localUserId };
+            return { roomId: this.roomId, userId: this.localUserId, appId: this.appId };
             
         } catch (error) {
             console.error('❌ Failed to create room:', error);
             this.onError(error);
             throw error;
+        }
+    }
+
+    /**
+     * 从后端获取配置
+     */
+    async fetchConfig() {
+        console.log('📥 Fetching config from backend...');
+        
+        try {
+            const response = await fetch('/api/config');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.config) {
+                this.appId = data.config.appId;
+                console.log('✅ Config fetched:', { appId: this.appId, aiMode: data.config.aiMode });
+            } else {
+                throw new Error('Invalid config response');
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to fetch config:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 从后端获取 Token
+     */
+    async fetchToken(roomId, uid) {
+        console.log('📥 Fetching token from backend...', { roomId, uid });
+        
+        try {
+            const response = await fetch(`/api/token?roomId=${encodeURIComponent(roomId)}&uid=${encodeURIComponent(uid)}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.token) {
+                console.log('✅ Token fetched, expires in:', data.expireIn, 'seconds');
+                return data.token;
+            } else {
+                throw new Error('Invalid token response');
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to fetch token:', error);
+            // 降级：前端生成 Token（简化版，生产环境不推荐）
+            console.warn('⚠️ Falling back to client-side token generation');
+            return this.generateToken(roomId, uid);
         }
     }
 
