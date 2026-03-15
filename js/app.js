@@ -917,18 +917,15 @@ async function initRTC() {
 }
 
 // 等待 SDK 加载
+/**
+ * 等待 RTC SDK 加载
+ * 注意：不要设置 window.VERTC = null，允许后续重试
+ */
 function waitForRTCSdk() {
     return new Promise((resolve, reject) => {
         // SDK 已加载
         if (window.VERTC) {
             resolve();
-            return;
-        }
-
-        // SDK 加载失败（被设为 null）
-        if (window.VERTC === null) {
-            console.warn('⚠️ RTC SDK not available');
-            reject(new Error('RTC SDK not available'));
             return;
         }
 
@@ -938,18 +935,12 @@ function waitForRTCSdk() {
                 clearInterval(checkInterval);
                 resolve();
             }
-            // SDK 加载失败
-            if (window.VERTC === null) {
-                clearInterval(checkInterval);
-                reject(new Error('RTC SDK not available'));
-            }
         }, 100);
 
-        // 超时处理
+        // 超时处理（10 秒）
         setTimeout(() => {
             clearInterval(checkInterval);
-            // 超时后标记为不可用
-            window.VERTC = null;
+            // 拒绝 Promise，但不清除 window.VERTC，允许后续重试
             reject(new Error('RTC SDK load timeout'));
         }, 10000);
     });
