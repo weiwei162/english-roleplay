@@ -1,29 +1,20 @@
 #!/usr/bin/env node
 /**
  * 火山引擎 RTC Token 生成工具
- * 
- * 参考官方文档：
- * - Token 生成：https://www.volcengine.com/docs/6348/70114
- * - 参数赋值规范：https://www.volcengine.com/docs/6348/70114
- * 
- * 使用方法：
- * node token-generator.js <appId> <appKey> <roomId> <uid> [expireSeconds]
- * 
- * 示例：
- * node token-generator.js 123456 abcdef room123 user1 86400
+ * 基于官方 AccessToken.js 实现
  */
 
-const crypto = require('crypto');
+const AccessToken = require('./AccessToken');
 
 /**
  * 生成 RTC Token
  * 
  * @param {string} appId - RTC AppID
  * @param {string} appKey - RTC AppKey
- * @param {string} roomId - 房间 ID
+ * @param {string} roomId - 房间 ID（通配 Token 传 "*"）
  * @param {string} uid - 用户 ID
  * @param {number} expireSeconds - 有效期（秒），默认 24 小时
- * @returns {string} Base64 编码的 Token
+ * @returns {string} Token 字符串
  */
 function generateToken(appId, appKey, roomId, uid, expireSeconds = 86400) {
     if (!appId || !appKey) {
@@ -35,93 +26,70 @@ function generateToken(appId, appKey, roomId, uid, expireSeconds = 86400) {
     }
     
     const now = Math.floor(Date.now() / 1000);
-    const expire = now + expireSeconds;
+    const expireAt = now + expireSeconds;
     
-    // Token payload（官方格式）
-    const payload = {
-        app_id: appId,
-        room_id: roomId,
-        uid: uid,
-        expire: expire,
-        // 权限配置（至少需要一个权限才能进房）
-        permissions: {
-            // 订阅流权限（接收音视频）
-            subscribe_stream: true,
-            // 发布流权限（发送音视频）
-            publish_stream: true,
-            // 订阅消息权限
-            subscribe_message: true,
-            // 发布消息权限
-            publish_message: true
-        }
-    };
+    // 创建 Token
+    const token = new AccessToken.AccessToken(appId, appKey, roomId, uid);
     
-    // 生成签名（使用 HMAC-SHA256）
-    const signature = crypto.createHmac('sha256', appKey)
-        .update(JSON.stringify(payload))
-        .digest('hex');
+    // 设置过期时间
+    token.expireTime(expireAt);
     
-    // 组合 Token
-    const token = {
-        ...payload,
-        signature
-    };
+    // 添加权限
+    // PrivPublishStream (0) = 发布流权限
+    // PrivSubscribeStream (4) = 订阅流权限
+    token.addPrivilege(AccessToken.privileges.PrivPublishStream, expireAt);
+    token.addPrivilege(AccessToken.privileges.PrivSubscribeStream, expireAt);
     
-    // Base64 编码
-    return Buffer.from(JSON.stringify(token)).toString('base64');
+    // 生成 Token 字符串
+    return token.serialize();
 }
 
 /**
- * 生成通配 Token（可以加入任意房间）
- * 
- * @param {string} appId - RTC AppID
- * @param {string} appKey - RTC AppKey
- * @param {string} uid - 用户 ID
- * @param {number} expireSeconds - 有效期（秒）
- * @returns {string} Base64 编码的通配 Token
+ * 生成通配 Token
  */
 function generateWildcardToken(appId, appKey, uid, expireSeconds = 86400) {
-    // 通配 Token 使用 "*" 作为 roomId
     return generateToken(appId, appKey, '*', uid, expireSeconds);
 }
 
 /**
  * 验证 Token
- * 
- * @param {string} token - Base64 编码的 Token
- * @param {string} appKey - RTC AppKey
- * @returns {Object} 验证结果
  */
-function verifyToken(token, appKey) {
+function verifyToken(tokenString, appKey) {
     try {
-        // Base64 解码
-        const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
+        const token = AccessToken.Parse(tokenString);
         
-        // 提取签名
-        const { signature, ...payload } = decoded;
-        
-        // 重新计算签名
-        const expectedSignature = crypto.createHmac('sha256', appKey)
-            .update(JSON.stringify(payload))
-            .digest('hex');
+        if (!token) {
+            return {
+                valid: false,
+                error: 'Failed to parse token'
+            };
+        }
         
         // 验证签名
-        const isValid = signature === expectedSignature;
+        const signatureValid = token.verify(appKey);
         
-        // 检查过期时间
+        // 检查过期
         const now = Math.floor(Date.now() / 1000);
-        const isExpired = decoded.expire <= now;
+        const isExpired = token.expireAt > 0 && now > token.expireAt;
         
         return {
-            valid: isValid && !isExpired,
-            decoded: decoded,
+            valid: signatureValid && !isExpired,
+            decoded: {
+                appId: token.appID,
+                roomID: token.roomID,
+                userID: token.userID,
+                nonce: token.nonce,
+                issuedAt: token.issuedAt,
+                expireAt: token.expireAt,
+                privileges: token.privileges
+            },
             expired: isExpired,
-            signatureValid: isValid
+            signatureValid: signatureValid
         };
-    } catch (error) {
+    } catch (err) {
         return {
             valid: false,
-            error: error.message
+            error: err.message
         };
     }
 }
@@ -133,7 +101,7 @@ if (require.main === module) {
     
     if (args.length < 4) {
         console.log(`
-火山引擎 RTC Token 生成工具
+火山引擎 RTC Token 生成工具（官方算法）
 
 用法:
   node token-generator.js <appId> <appKey> <roomId> <uid> [expireSeconds]
@@ -141,13 +109,12 @@ if (require.main === module) {
 参数:
   appId         - RTC AppID
   appKey        - RTC AppKey
-  roomId        - 房间 ID
+  roomId        - 房间 ID（通配 Token 传 "*"）
   uid           - 用户 ID
   expireSeconds - 有效期（秒），默认 86400（24 小时）
 
 示例:
-  node token-generator.js 123456 abcdef room123 user1 86400
-  node token-generator.js 123456 abcdef '*' user1  # 通配 Token
+  node token-generator.js 123456789012345678901234 abcdef room123 user1 86400
 
 `);
         process.exit(1);
@@ -163,12 +130,17 @@ if (require.main === module) {
         console.log('\n====================');
         console.log('Token 信息:');
         
-        const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
-        console.log('AppId:', decoded.app_id);
-        console.log('RoomId:', decoded.room_id);
-        console.log('Uid:', decoded.uid);
-        console.log('过期时间:', new Date(decoded.expire * 1000).toLocaleString());
-        console.log('有效期:', (decoded.expire - Math.floor(Date.now() / 1000)) / 3600, '小时');
+        const verify = verifyToken(token, appKey);
+        if (verify.valid) {
+            console.log('AppId:', verify.decoded.appId);
+            console.log('RoomId:', verify.decoded.roomID);
+            console.log('Uid:', verify.decoded.userID);
+            console.log('过期时间:', new Date(verify.decoded.expireAt * 1000).toLocaleString());
+            console.log('权限:', verify.decoded.privileges);
+            console.log('\n验证结果: ✅ 有效');
+        } else {
+            console.log('❌ 验证失败:', verify.error);
+        }
         
     } catch (error) {
         console.error('❌ 错误:', error.message);
@@ -176,10 +148,9 @@ if (require.main === module) {
     }
 }
 
-// ==================== 导出 ====================
-
 module.exports = {
     generateToken,
     generateWildcardToken,
-    verifyToken
+    verifyToken,
+    privileges: AccessToken.privileges
 };

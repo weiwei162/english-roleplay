@@ -9,6 +9,7 @@
  */
 
 const crypto = require('crypto');
+const { generateToken: generateOfficialToken } = require('./token-generator-official');
 const https = require('https');
 
 class VolcStartVoiceChatClient {
@@ -240,49 +241,15 @@ class VolcStartVoiceChatClient {
      * @param {number} expireSeconds - 有效期（秒），默认 24 小时
      * @returns {string} Base64 编码的 Token
      */
-    generateToken(roomId, uid = 'client', expireSeconds = 86400) { // 默认 24 小时
-        const appId = process.env.VOLC_APP_ID;
-        const appKey = process.env.VOLC_APP_KEY;
-        
-        if (!appId || !appKey) {
-            throw new Error('VOLC_APP_ID and VOLC_APP_KEY required');
-        }
-        
-        const now = Math.floor(Date.now() / 1000);
-        const expire = now + expireSeconds;
-        
-        // Token payload
-        const payload = {
-            app_id: appId,
-            room_id: roomId,
-            uid: uid,
-            expire: expire,
-            // 权限配置（至少需要一个权限才能进房）
-            permissions: {
-                // 订阅流权限（接收音视频）
-                subscribe_stream: true,
-                // 发布流权限（发送音视频）
-                publish_stream: true,
-                // 订阅消息权限
-                subscribe_message: true,
-                // 发布消息权限
-                publish_message: true
-            }
-        };
-        
-        // 生成签名
-        const signature = crypto.createHmac('sha256', appKey)
-            .update(JSON.stringify(payload))
-            .digest('hex');
-        
-        // 组合 Token
-        const token = {
-            ...payload,
-            signature
-        };
-        
-        // Base64 编码
-        return Buffer.from(JSON.stringify(token)).toString('base64');
+    generateToken(roomId, uid = 'client', expireSeconds = 86400) {
+        // 使用官方格式的 Token 生成器
+        return generateOfficialToken(
+            process.env.VOLC_APP_ID,
+            process.env.VOLC_APP_KEY,
+            roomId,
+            uid,
+            expireSeconds
+        );
     }
 
     /**

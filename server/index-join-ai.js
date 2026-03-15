@@ -13,7 +13,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, CHARACTER_CONFIGS } = require('./volc-start-voicechat');
-const { generateToken, generateWildcardToken } = require('./token-generator');
+const { generateToken, generateWildcardToken, verifyToken } = require('./token-generator');
 require('dotenv').config();
 
 const app = express();
