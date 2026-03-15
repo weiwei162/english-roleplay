@@ -9,40 +9,8 @@ let contentCounter = 0;
 let characterPosition = { x: 50, y: 60 }; // 角色位置（百分比）
 let audioContext = null;
 
-// 初始化语音识别
-function initSpeechRecognition() {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        
-        recognition.onstart = function() {
-            isRecording = true;
-            updateRecordButton();
-        };
-        
-        recognition.onend = function() {
-            isRecording = false;
-            updateRecordButton();
-        };
-        
-        recognition.onresult = function(event) {
-            const transcript = event.results[0][0].transcript;
-            document.getElementById('recording-status').textContent = 
-                `You said: "${transcript}"`;
-            handleChildInput(transcript);
-        };
-        
-        recognition.onerror = function(event) {
-            isRecording = false;
-            updateRecordButton();
-            document.getElementById('recording-status').textContent = 
-                'Click the microphone and try again! 🎤';
-        };
-    }
-}
+// ⚠️ 语音识别已移除：StartVoiceChat 模式下不需要
+// 火山引擎云端自动处理 ASR 语音识别
 
 // 音效系统
 function initAudio() {
@@ -108,61 +76,8 @@ function playSound(type) {
     }
 }
 
-// 切换录音状态
-function toggleRecording() {
-    if (!recognition) {
-        document.getElementById('recording-status').textContent = 
-            'Speech recognition not supported. Try Chrome browser! 🌐';
-        return;
-    }
-    
-    if (isRecording) {
-        recognition.stop();
-    } else {
-        recognition.start();
-    }
-}
-
-// 开始录音
-function startRecording() {
-    if (!recognition) {
-        alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
-        return;
-    }
-    
-    try {
-        recognition.start();
-        console.log('🎤 Recording started');
-    } catch (error) {
-        console.error('Failed to start recording:', error);
-    }
-}
-
-// 停止录音
-function stopRecording() {
-    if (!recognition) return;
-    
-    try {
-        recognition.stop();
-        console.log('🔇 Recording stopped');
-    } catch (error) {
-        console.error('Failed to stop recording:', error);
-    }
-}
-
-// 更新录音按钮状态
-function updateRecordButton() {
-    const btn = document.getElementById('record-btn');
-    const text = btn.querySelector('.record-text');
-    
-    if (isRecording) {
-        btn.classList.add('recording');
-        text.textContent = 'Listening...';
-    } else {
-        btn.classList.remove('recording');
-        text.textContent = '按住说话';
-    }
-}
+// ⚠️ 录音相关函数已移除：StartVoiceChat 模式下不需要
+// 音频通过 RTC 直接传输，不需要手动录音
 
 // 语音合成 + 说话动画
 function speak(text, callback) {
@@ -512,11 +427,15 @@ async function selectScene(sceneId) {
     }
     
     // 开始对话
-    // 注意：如果是 StartVoiceChat 模式，AI 会自动说欢迎词
-    // 本地模式会播放预定义的对话
-    setTimeout(() => {
-        startDialogue();
-    }, 500);
+    // 注意：StartVoiceChat 模式下，AI 会自动说话，不需要播放预定义对话
+    // 只有本地模式才播放预定义对话
+    if (!isStartVoiceChatMode) {
+        setTimeout(() => {
+            startDialogue();
+        }, 500);
+    } else {
+        console.log('🎤 StartVoiceChat mode, AI will speak automatically');
+    }
 }
 
 // 清空画布内容
@@ -885,15 +804,8 @@ function bindEvents() {
         });
     });
 
-    // 录音按钮
-    const recordBtn = document.getElementById('record-btn');
-    if (recordBtn) {
-        recordBtn.addEventListener('mousedown', startRecording);
-        recordBtn.addEventListener('mouseup', stopRecording);
-        recordBtn.addEventListener('mouseleave', stopRecording);
-        recordBtn.addEventListener('touchstart', startRecording);
-        recordBtn.addEventListener('touchend', stopRecording);
-    }
+    // ⚠️ 录音按钮已移除：StartVoiceChat 模式下不需要
+    // 音频通过 RTC 直接传输，不需要手动录音
 
     console.log('✅ Events bound');
 }
