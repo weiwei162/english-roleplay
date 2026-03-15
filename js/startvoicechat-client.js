@@ -327,13 +327,27 @@ class StartVoiceChatClient {
             console.log('📥 User published stream:', userId, mediaType);
             
             try {
-                // 订阅流
-                await this.engine.subscribeStream(userId, {
-                    audio: true,
-                    video: mediaType === 2 // 视频流
-                });
+                // 订阅流（根据 mediaType 订阅）
+                // mediaType: 1=音频，2=视频，3=数据
+                const subscribeOptions = {};
                 
-                console.log('✅ Subscribed to', userId, 'audio/video');
+                if (mediaType === 1) {
+                    // 音频流
+                    subscribeOptions.audio = true;
+                } else if (mediaType === 2) {
+                    // 视频流
+                    subscribeOptions.video = true;
+                } else if (mediaType === 3) {
+                    // 数据流
+                    subscribeOptions.data = true;
+                } else {
+                    console.warn('⚠️ Invalid mediaType:', mediaType);
+                    return;
+                }
+                
+                await this.engine.subscribeStream(userId, subscribeOptions);
+                
+                console.log('✅ Subscribed to', userId, 'stream (type:', mediaType + ')');
                 
                 // 如果是远端用户的流（不是自己）
                 if (userId !== this.localUserId) {
