@@ -289,17 +289,17 @@ function handleCharacterClick() {
     speak(response.text);
 }
 
-// ==================== ⭐ StartVoiceChat AI 语音对话集成 ====================
+// ==================== ⭐ StartVoiceChat AI 语音对话集成（正确流程） ====================
 
 /**
- * StartVoiceChat 集成说明
+ * StartVoiceChat 集成说明（正确流程）
  * 
  * 流程：
- * 1. 用户选择场景 → selectScene()
- * 2. 调用 createAIVoiceChatRoom()
- * 3. 后端创建房间并启动 AI (火山 StartVoiceChat API)
- * 4. 前端通过 RTC 加入房间
- * 5. 实时对话开始
+ * 1. 前端创建 RTC 房间并加入
+ * 2. 开启本地音视频采集
+ * 3. 订阅和播放房间内音视频流
+ * 4. 调用后端接口将 AI 角色加入 RTC 房间
+ * 5. 结束时调用后端接口结束 AI 对话，然后离开并销毁房间
  * 
  * 数据流：
  * 孩子说话 → RTC 音频流 → 火山云端 (ASR+LLM+TTS) → RTC 音频流 → 播放 AI 声音
@@ -314,7 +314,7 @@ let currentAiTaskId = null;
 let isStartVoiceChatMode = true;
 
 /**
- * 创建 AI 语音聊天房间（使用 StartVoiceChat API）
+ * 创建 AI 语音聊天房间（正确流程：前端创建房间 → AI 加入）
  * 
  * 调用时机：用户选择场景后
  * 调用位置：selectScene() 函数中
@@ -325,7 +325,7 @@ async function createAIVoiceChatRoom() {
         return;
     }
     
-    console.log('🏠 Creating StartVoiceChat room...');
+    console.log('🏠 [1/4] Creating RTC room (frontend)...');
     console.log('   Character:', currentCharacter.id);
     console.log('   Scene:', currentScene.id);
     
@@ -335,26 +335,35 @@ async function createAIVoiceChatRoom() {
     try {
         // 显示加载动画
         showVideoLoading();
-        updateRTCStatus('connecting', '正在连接 AI...');
+        updateRTCStatus('creating', '正在创建房间...');
         
-        // 使用 StartVoiceChat 客户端创建房间并加入
-        // 详细实现：js/startvoicechat-client.js
+        // 步骤 1: 前端创建 RTC 房间并加入
+        // 使用 StartVoiceChat 客户端（正确流程版本）
         await createStartVoiceChatRoom(
             currentRoomId,
-            currentCharacter.id,
+            process.env.VOLC_APP_ID || 'YOUR_APP_ID', // 从配置获取
             {
-                // 就绪回调：AI 已加入房间，可以开始对话
-                onReady: (info) => {
-                    console.log('✅ AI voice chat ready:', info);
+                // 房间创建成功回调
+                onReady: () => {
+                    console.log('✅ [1/4] Room created and joined');
+                    updateRTCStatus('room_ready', '房间已创建，等待 AI 加入...');
+                    
+                    // 步骤 2: 调用后端 API 将 AI 加入房间
+                    joinAIWithCharacter(currentCharacter.id);
+                },
+                
+                // AI 已加入回调
+                onAIJoined: (info) => {
+                    console.log('✅ [2/4] AI joined room:', info);
                     currentAiTaskId = info.taskId;
                     hideVideoLoading();
                     updateRTCStatus('connected', 'AI 角色已就绪');
                     
-                    // 开始对话（AI 会说欢迎词）
-                    console.log('🎤 Starting conversation...');
+                    // 步骤 3: 开始对话（AI 会自动说欢迎词）
+                    console.log('🎤 [3/4] Starting conversation...');
                 },
                 
-                // 错误回调：创建房间失败
+                // 错误回调
                 onError: (error) => {
                     console.error('❌ Voice chat error:', error);
                     showVideoError(error.message);
@@ -369,19 +378,38 @@ async function createAIVoiceChatRoom() {
                 onStatusChange: (status, text) => {
                     console.log('📊 RTC Status:', status, '-', text);
                     updateRTCStatus(status, text);
+                },
+                
+                // 远端流回调
+                onRemoteStream: (stream) => {
+                    console.log('📥 [4/4] Remote stream received:', stream);
                 }
             }
         );
         
-        console.log('✅ StartVoiceChat room created and joined');
+        console.log('✅ Room creation initiated');
         console.log('   RoomId:', currentRoomId);
-        console.log('   TaskId:', currentAiTaskId);
         
     } catch (error) {
-        console.error('❌ Failed to create StartVoiceChat room:', error);
+        console.error('❌ Failed to create room:', error);
         // 降级到本地对话模式
         console.log('📌 Using local dialogue mode');
         isStartVoiceChatMode = false;
+    }
+}
+
+/**
+ * 将 AI 角色加入房间（调用后端 API）
+ */
+async function joinAIWithCharacter(character) {
+    console.log('🤖 Joining AI character:', character);
+    
+    try {
+        await joinAICharacter(character);
+        console.log('✅ AI character joined');
+    } catch (error) {
+        console.error('❌ Failed to join AI:', error);
+        showVideoError(error.message);
     }
 }
 
@@ -396,7 +424,7 @@ async function leaveAIVoiceChatRoom() {
     console.log('👋 Leaving StartVoiceChat room:', currentRoomId);
     
     try {
-        // 离开 StartVoiceChat 房间
+        // 离开 StartVoiceChat 房间（自动调用后端结束 AI 对话）
         // 详细实现：js/startvoicechat-client.js
         await leaveStartVoiceChatRoom();
         

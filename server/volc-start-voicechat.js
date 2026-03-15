@@ -32,8 +32,8 @@ class VolcStartVoiceChatClient {
      * 生成签名密钥
      */
     _getSigningKey(date, region, service) {
-        const kDate = crypto.createHmac('sha256', `HMAC-SHA256${date}`)
-            .update(this.secretKey)
+        const kDate = crypto.createHmac('sha256', this.secretKey)
+            .update(date)
             .digest();
         const kRegion = crypto.createHmac('sha256', kDate)
             .update(region)
@@ -83,7 +83,7 @@ class VolcStartVoiceChatClient {
             this._sha256(canonicalRequest)
         ].join('\n');
         
-        const signingKey = this._getSigningKey(dateStr, this.region, serviceInfo);
+        const signingKey = this._getSigningKey(dateStr, this.region, this.service);
         const signature = crypto.createHmac('sha256', signingKey)
             .update(stringToSign)
             .digest('hex');
@@ -145,6 +145,7 @@ class VolcStartVoiceChatClient {
      * @param {string} config.roomId - RTC 房间 ID
      * @param {string} config.taskId - 任务 ID（AppId+RoomId 下唯一）
      * @param {string} config.targetUserId - 真人用户 ID
+     * @param {string} config.agentUserId - AI 助手用户 ID（可选，默认 AIAssistant）
      * @param {Object} config.asrConfig - ASR 配置
      * @param {Object} config.llmConfig - LLM 配置
      * @param {Object} config.ttsConfig - TTS 配置
@@ -164,6 +165,7 @@ class VolcStartVoiceChatClient {
                 TTSConfig: config.ttsConfig
             },
             AgentConfig: {
+                UserId: config.agentUserId || 'AIAssistant',
                 TargetUserId: [config.targetUserId],
                 WelcomeMessage: config.welcomeMessage || 'Hello! I\'m your English friend. Let\'s chat!',
                 IdleTimeout: config.idleTimeout || 180
@@ -183,6 +185,7 @@ class VolcStartVoiceChatClient {
      * @param {string} config.roomId - RTC 房间 ID
      * @param {string} config.taskId - 任务 ID
      * @param {string} config.targetUserId - 真人用户 ID
+     * @param {string} config.agentUserId - AI 助手用户 ID（可选，默认 AIAssistant）
      * @param {Object} config.s2sConfig - S2S 配置
      * @param {string} config.welcomeMessage - 欢迎词
      * @param {number} config.idleTimeout - 空闲超时（秒）
@@ -198,6 +201,7 @@ class VolcStartVoiceChatClient {
                 S2SConfig: config.s2sConfig
             },
             AgentConfig: {
+                UserId: config.agentUserId || 'AIAssistant',
                 TargetUserId: [config.targetUserId],
                 WelcomeMessage: config.welcomeMessage || 'Hello! I\'m your English friend. Let\'s chat!',
                 IdleTimeout: config.idleTimeout || 180

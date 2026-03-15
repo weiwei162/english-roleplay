@@ -1,38 +1,99 @@
 /**
- * StartVoiceChat 前端客户端
+ * StartVoiceChat 前端客户端（正确流程）
  * 集成火山引擎 StartVoiceChat API
  * 文档：https://www.volcengine.com/docs/6348/1558163
+ * 
+ * 正确流程：
+ * 1. 前端创建 RTC 房间并加入
+ * 2. 开启本地音视频采集
+ * 3. 订阅和播放房间内音视频流
+ * 4. 调用后端接口将 AI 角色加入 RTC 房间
+ * 5. 结束时调用后端接口结束 AI 对话，然后离开并销毁房间
  */
 
 class StartVoiceChatClient {
     constructor(options = {}) {
-        this.appId = null;
+        this.appId = options.appId; // 从前端配置获取
         this.roomId = null;
         this.taskId = null;
         this.character = null;
         this.engine = null;
-        this.targetUserId = 'child_user';
+        this.localUserId = null;
+        this.remoteUsers = new Map();
+        this.isRoomCreated = false;
+        this.isAIJoined = false;
         
         // 回调
         this.onReady = options.onReady || (() => {});
         this.onError = options.onError || (() => {});
         this.onStatusChange = options.onStatusChange || (() => {});
+        this.onAIJoined = options.onAIJoined || (() => {});
+        this.onRemoteStream = options.onRemoteStream || (() => {});
     }
 
     /**
-     * 创建房间并启动 AI 对话
+     * 步骤 1: 创建 RTC 房间（前端创建）
+     * 
+     * @param {string} roomId - 房间 ID（前端生成）
+     * @param {string} appId - RTC AppId（前端配置）
      */
-    async createRoom(roomId, character) {
-        console.log('🏠 Creating StartVoiceChat room...', { roomId, character });
+    async createRoom(roomId, appId) {
+        console.log('🏠 [1/5] Creating RTC room (frontend)...', { roomId, appId });
         
         try {
-            // 1. 调用后端 API 创建房间
-            const response = await fetch('/api/create-room', {
+            this.roomId = roomId;
+            this.appId = appId || this.appId;
+            
+            if (!this.appId) {
+                throw new Error('AppId is required');
+            }
+            
+            // 初始化 RTC 引擎
+            await this.initRTC();
+            
+            // 生成用户 ID
+            this.localUserId = `child_${Date.now()}`;
+            
+            // 创建 Token（前端生成，或使用后端 API）
+            const token = this.generateToken(this.roomId, this.localUserId);
+            
+            // 加入房间
+            await this.joinRoom(token);
+            
+            // 开启本地音视频采集
+            await this.startLocalCapture();
+            
+            this.isRoomCreated = true;
+            
+            console.log('✅ [1/5] RTC room created and joined');
+            this.onStatusChange('room_created', '房间已创建');
+            
+            return { roomId: this.roomId, userId: this.localUserId };
+            
+        } catch (error) {
+            console.error('❌ Failed to create room:', error);
+            this.onError(error);
+            throw error;
+        }
+    }
+
+    /**
+     * 步骤 2: 调用后端 API 将 AI 角色加入房间
+     * 
+     * @param {string} character - 角色 ID（emma/tommy/lily 等）
+     */
+    async joinAI(character) {
+        console.log('🤖 [2/5] Joining AI character to room...', { character, roomId: this.roomId });
+        
+        try {
+            // 调用后端 API，将 AI 加入已创建的 RTC 房间
+            const response = await fetch('/api/join-ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    roomId,
-                    character
+                    roomId: this.roomId,
+                    character: character,
+                    targetUserId: this.localUserId // 告诉 AI 要对话的用户
                 })
             });
             
@@ -43,47 +104,38 @@ class StartVoiceChatClient {
             
             const data = await response.json();
             
-            console.log('✅ Room created:', data);
+            console.log('✅ [2/5] AI joined room:', data);
             
-            // 保存会话信息
-            this.appId = data.appId;
-            this.roomId = data.roomId;
             this.taskId = data.taskId;
-            this.character = data.character;
+            this.character = character;
+            this.isAIJoined = true;
             
-            // 2. 初始化 RTC 引擎
-            await this.initRTC();
-            
-            // 3. 加入 RTC 房间
-            await this.joinRoom(data.token);
-            
-            // 4. 触发就绪回调
-            this.onReady({
-                roomId: this.roomId,
-                taskId: this.taskId,
-                character: this.character,
+            // 触发 AI 已加入回调
+            this.onAIJoined({
+                character: character,
+                taskId: data.taskId,
                 aiMode: data.aiMode
             });
+            
+            this.onStatusChange('ai_joined', 'AI 角色已加入');
             
             return data;
             
         } catch (error) {
-            console.error('❌ Failed to create room:', error);
+            console.error('❌ Failed to join AI:', error);
             this.onError(error);
             throw error;
         }
     }
 
     /**
-     * 初始化 RTC 引擎
+     * 步骤 3: 初始化 RTC 引擎
      */
     async initRTC() {
         return new Promise((resolve, reject) => {
-            // 检查 SDK 是否加载
             if (!window.VERTC) {
                 console.warn('⚠️ RTC SDK not loaded, waiting...');
                 
-                // 等待 SDK 加载
                 const checkInterval = setInterval(() => {
                     if (window.VERTC) {
                         clearInterval(checkInterval);
@@ -91,7 +143,6 @@ class StartVoiceChatClient {
                     }
                 }, 100);
                 
-                // 超时
                 setTimeout(() => {
                     clearInterval(checkInterval);
                     reject(new Error('RTC SDK load timeout'));
@@ -105,12 +156,12 @@ class StartVoiceChatClient {
     }
 
     /**
-     * 加入 RTC 房间
+     * 步骤 4: 加入 RTC 房间
      */
     async joinRoom(token) {
+        console.log('🔌 Joining RTC room:', this.roomId, 'as', this.localUserId);
+        
         try {
-            console.log('🔌 Joining RTC room:', this.roomId);
-            
             // 创建引擎
             this.engine = window.VERTC.createEngine(this.appId);
             
@@ -124,23 +175,46 @@ class StartVoiceChatClient {
             await this.engine.joinRoom(
                 token,
                 this.roomId,
-                { userId: this.targetUserId },
+                { userId: this.localUserId },
                 {
-                    isAutoPublish: false,
-                    isAutoSubscribeAudio: true,
-                    isAutoSubscribeVideo: true,
+                    isAutoPublish: true, // 自动发布本地流
+                    isAutoSubscribeAudio: true, // 自动订阅音频
+                    isAutoSubscribeVideo: true, // 自动订阅视频
                     roomProfileType: window.VERTC.RoomProfileType.communication
                 }
             );
             
             console.log('✅ Joined RTC room:', this.roomId);
             
-            // 更新状态
-            this.onStatusChange('connected', '已连接到 AI 角色');
-            
         } catch (error) {
             console.error('❌ Failed to join room:', error);
             this.onStatusChange('error', '连接失败：' + error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 步骤 5: 开启本地音视频采集
+     */
+    async startLocalCapture() {
+        console.log('🎤 Starting local audio capture...');
+        
+        try {
+            if (!this.engine) {
+                throw new Error('Engine not initialized');
+            }
+            
+            // 开启音频采集
+            await this.engine.startAudioCapture();
+            console.log('✅ Local audio capture started');
+            
+            // 可选：开启视频采集（如果需要）
+            // await this.engine.startVideoCapture();
+            
+            this.onStatusChange('local_ready', '本地音视频已就绪');
+            
+        } catch (error) {
+            console.error('❌ Failed to start local capture:', error);
             throw error;
         }
     }
@@ -151,22 +225,41 @@ class StartVoiceChatClient {
     setupEventListeners() {
         if (!this.engine) return;
         
+        // 用户加入
+        this.engine.on(window.VERTC.events.onUserJoin, (e) => {
+            console.log('👤 User joined:', e.userId);
+            
+            // 如果是 AI 角色加入
+            if (e.userId.startsWith('ai_')) {
+                console.log('✅ AI character joined:', e.userId);
+            }
+        });
+        
         // 用户发布流
         this.engine.on(window.VERTC.events.onUserPublishStream, async (e) => {
-            console.log('📥 User published stream:', e.userId, e.mediaType);
+            const { userId, mediaType } = e;
+            console.log('📥 User published stream:', userId, mediaType);
             
             try {
-                // 订阅音频
-                await this.engine.subscribeStream(e.userId, {
+                // 订阅流
+                await this.engine.subscribeStream(userId, {
                     audio: true,
-                    video: e.mediaType === 2 // 如果是视频流
+                    video: mediaType === 2 // 视频流
                 });
                 
-                console.log('✅ Subscribed to', e.userId, 'audio/video');
+                console.log('✅ Subscribed to', userId, 'audio/video');
                 
-                // 如果是 AI 角色的流，设置视频播放器
-                if (e.userId !== this.targetUserId && e.mediaType === 2) {
-                    this.setupRemoteVideo(e.userId);
+                // 如果是远端用户的流（不是自己）
+                if (userId !== this.localUserId) {
+                    this.remoteUsers.set(userId, { userId, mediaType });
+                    
+                    // 如果是视频流，设置播放器
+                    if (mediaType === 2) {
+                        this.setupRemoteVideo(userId);
+                    }
+                    
+                    // 触发远端流回调
+                    this.onRemoteStream({ userId, mediaType });
                 }
                 
             } catch (error) {
@@ -177,19 +270,18 @@ class StartVoiceChatClient {
         // 用户取消发布
         this.engine.on(window.VERTC.events.onUserUnPublishStream, (e) => {
             console.log('📴 User unpublished stream:', e.userId);
-        });
-        
-        // 用户加入
-        this.engine.on(window.VERTC.events.onUserJoin, (e) => {
-            console.log('👤 User joined:', e.userId);
-            this.onStatusChange('connected', 'AI 角色已加入');
+            this.remoteUsers.delete(e.userId);
         });
         
         // 用户离开
         this.engine.on(window.VERTC.events.onUserLeave, (e) => {
             console.log('👋 User left:', e.userId);
-            if (e.userId !== this.targetUserId) {
-                this.onStatusChange('disconnected', 'AI 角色已离开');
+            this.remoteUsers.delete(e.userId);
+            
+            // 如果是 AI 离开
+            if (e.userId.startsWith('ai_')) {
+                console.log('⚠️ AI character left');
+                this.onStatusChange('ai_left', 'AI 角色已离开');
             }
         });
         
@@ -200,7 +292,7 @@ class StartVoiceChatClient {
             this.onError(new Error(e.message));
         });
         
-        // 音频数据（可选：用于实时音量检测）
+        // 音频数据（可选：用于音量检测）
         this.engine.on(window.VERTC.events.onAudioData, (e) => {
             // 可以在这里处理接收到的音频数据
             // console.log('🎵 Audio data from', e.userId, ':', e.data.byteLength, 'bytes');
@@ -238,18 +330,49 @@ class StartVoiceChatClient {
     }
 
     /**
-     * 离开房间
+     * 步骤 6: 结束 AI 对话并离开房间
+     * 
+     * 流程：
+     * 1. 调用后端 API 结束 AI 对话
+     * 2. 离开 RTC 房间
+     * 3. 销毁引擎
      */
     async leave() {
-        console.log('👋 Leaving StartVoiceChat room...');
+        console.log('👋 [1/3] Leaving StartVoiceChat room...');
         
         try {
-            if (this.engine) {
-                await this.engine.leaveRoom();
-                console.log('✅ Left room');
+            // 1. 调用后端结束 AI 对话
+            if (this.roomId && this.taskId) {
+                console.log('🤖 [2/3] Stopping AI conversation...');
+                await fetch('/api/leave-room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        roomId: this.roomId,
+                        taskId: this.taskId
+                    })
+                });
+                console.log('✅ AI conversation stopped');
             }
             
-            this.engine = null;
+            // 2. 离开 RTC 房间
+            if (this.engine) {
+                console.log('🚪 [3/3] Leaving RTC room...');
+                await this.engine.leaveRoom();
+                console.log('✅ Left RTC room');
+            }
+            
+            // 3. 销毁引擎
+            if (this.engine) {
+                window.VERTC.destroyEngine(this.engine);
+                this.engine = null;
+                console.log('✅ Engine destroyed');
+            }
+            
+            this.remoteUsers.clear();
+            this.isRoomCreated = false;
+            this.isAIJoined = false;
+            
             this.onStatusChange('disconnected', '已断开连接');
             
         } catch (error) {
@@ -259,7 +382,7 @@ class StartVoiceChatClient {
     }
 
     /**
-     * 静音/取消静音
+     * 静音/取消静音本地音频
      */
     muteLocalAudio(muted) {
         if (!this.engine) return;
@@ -302,60 +425,90 @@ class StartVoiceChatClient {
             if (characterLayer) characterLayer.style.display = 'block';
         }
     }
+
+    /**
+     * 生成 RTC Token（前端生成，简化版）
+     * 注意：生产环境应该后端生成
+     */
+    generateToken(roomId, uid, expireSeconds = 3600) {
+        // 简单实现：使用固定 token 或调用后端 API 获取
+        // 这里假设后端提供了一个获取 token 的接口
+        
+        // 实际应该调用后端：GET /api/token?roomId=xxx&uid=xxx
+        // 返回真正的 token
+        
+        // 临时方案：返回空字符串，让后端验证
+        return '';
+    }
 }
 
-// ==================== 全局实例 ====================
+// ==================== 全局实例和辅助函数 ====================
 
 window.StartVoiceChatClient = StartVoiceChatClient;
 window.currentVoiceChat = null;
 
 /**
- * 创建并加入 AI 语音聊天房间
+ * 创建 RTC 房间并加入（前端创建）
  */
-async function createStartVoiceChatRoom(roomId, character, options = {}) {
+async function createStartVoiceChatRoom(roomId, appId, options = {}) {
     window.currentVoiceChat = new StartVoiceChatClient({
+        appId: appId,
         onReady: options.onReady || (() => {
-            console.log('✅ AI voice chat ready');
-            hideVideoLoading();
+            console.log('✅ Room created and ready');
         }),
         onError: options.onError || ((error) => {
             console.error('❌ Voice chat error:', error);
-            showVideoError(error.message);
         }),
         onStatusChange: options.onStatusChange || ((status, text) => {
             updateRTCStatus(status, text);
+        }),
+        onAIJoined: options.onAIJoined || ((info) => {
+            console.log('✅ AI joined:', info);
+            hideVideoLoading();
+        }),
+        onRemoteStream: options.onRemoteStream || ((stream) => {
+            console.log('📥 Remote stream:', stream);
         })
     });
     
     try {
-        await window.currentVoiceChat.createRoom(roomId, character);
+        // 步骤 1: 创建房间并加入
+        await window.currentVoiceChat.createRoom(roomId, appId);
+        
         return window.currentVoiceChat;
     } catch (error) {
-        console.error('❌ Failed to create voice chat room:', error);
+        console.error('❌ Failed to create room:', error);
         throw error;
     }
 }
 
 /**
- * 离开 AI 语音聊天房间
+ * 将 AI 角色加入房间
+ */
+async function joinAICharacter(character) {
+    if (!window.currentVoiceChat) {
+        throw new Error('Room not created');
+    }
+    
+    try {
+        // 步骤 2: 调用后端 API 将 AI 加入
+        await window.currentVoiceChat.joinAI(character);
+        
+    } catch (error) {
+        console.error('❌ Failed to join AI:', error);
+        throw error;
+    }
+}
+
+/**
+ * 离开房间并销毁
  */
 async function leaveStartVoiceChatRoom() {
     if (window.currentVoiceChat) {
         try {
             await window.currentVoiceChat.leave();
-            
-            // 调用后端结束 AI 对话
-            if (window.currentVoiceChat.roomId) {
-                await fetch('/api/leave-room', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ roomId: window.currentVoiceChat.roomId })
-                });
-            }
-            
             window.currentVoiceChat = null;
-            console.log('✅ Left voice chat room');
-            
+            console.log('✅ Left and destroyed room');
         } catch (error) {
             console.error('❌ Failed to leave room:', error);
         }
@@ -454,9 +607,13 @@ function toggleMute() {
 
 // 导出全局函数
 window.createStartVoiceChatRoom = createStartVoiceChatRoom;
+window.joinAICharacter = joinAICharacter;
 window.leaveStartVoiceChatRoom = leaveStartVoiceChatRoom;
 window.toggleVideoMode = toggleVideoMode;
 window.toggleMute = toggleMute;
 window.updateRTCStatus = updateRTCStatus;
+window.showVideoLoading = showVideoLoading;
+window.hideVideoLoading = hideVideoLoading;
+window.showVideoError = showVideoError;
 
-console.log('✅ StartVoiceChat client loaded');
+console.log('✅ StartVoiceChat client loaded (correct flow)');
