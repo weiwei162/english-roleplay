@@ -327,34 +327,25 @@ class StartVoiceChatClient {
             console.log('📥 User published stream:', userId, mediaType);
             
             try {
-                // 订阅流（根据 mediaType 订阅）
-                // mediaType: 1=音频，2=视频，3=数据
-                const subscribeOptions = {};
+                // 订阅流（第二个参数是数字）
+                // 1=音频，2=视频，3=音频 + 视频
+                let subscribeType = mediaType;
                 
-                if (mediaType === 1) {
-                    // 音频流
-                    subscribeOptions.audio = true;
-                } else if (mediaType === 2) {
-                    // 视频流
-                    subscribeOptions.video = true;
-                } else if (mediaType === 3) {
-                    // 数据流
-                    subscribeOptions.data = true;
-                } else {
-                    console.warn('⚠️ Invalid mediaType:', mediaType);
-                    return;
+                // 如果是 AI 角色，通常订阅音频 + 视频 (3)
+                if (userId.startsWith('ai_')) {
+                    subscribeType = 3; // 音频 + 视频
                 }
                 
-                await this.engine.subscribeStream(userId, subscribeOptions);
+                await this.engine.subscribeStream(userId, subscribeType);
                 
-                console.log('✅ Subscribed to', userId, 'stream (type:', mediaType + ')');
+                console.log('✅ Subscribed to', userId, 'stream (type:', subscribeType + ')');
                 
                 // 如果是远端用户的流（不是自己）
                 if (userId !== this.localUserId) {
                     this.remoteUsers.set(userId, { userId, mediaType });
                     
-                    // 如果是视频流，设置播放器
-                    if (mediaType === 2) {
+                    // 如果是视频流或音视频流，设置播放器
+                    if (mediaType === 2 || mediaType === 3) {
                         this.setupRemoteVideo(userId);
                     }
                     
