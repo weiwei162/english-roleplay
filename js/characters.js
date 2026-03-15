@@ -49,7 +49,12 @@ const characters = {
 
 // 获取角色信息
 function getCharacter(charId) {
-    return characters[charId] || characters.emma;
+    const char = characters[charId] || characters.emma;
+    // 添加 id 字段
+    return {
+        ...char,
+        id: charId
+    };
 }
 
 // 获取所有角色列表

@@ -238,7 +238,13 @@ function showScreen(screenId) {
 }
 
 // 选择角色
-function selectCharacter(charId) {
+async function selectCharacter(charId) {
+    // 离开之前的房间（如果有）
+    if (currentRoomId) {
+        console.log('👋 Leaving previous room...');
+        await leaveAIVoiceChatRoom();
+    }
+    
     currentCharacter = getCharacter(charId);
     
     document.getElementById('current-avatar').textContent = currentCharacter.avatar;
@@ -446,13 +452,20 @@ async function leaveAIVoiceChatRoom() {
  * 选择场景
  * 
  * 流程：
- * 1. 加载场景配置
- * 2. 设置背景
- * 3. 创建 AI 语音聊天房间（StartVoiceChat）
- * 4. 开始对话
+ * 1. 离开之前的房间（如果有）
+ * 2. 加载场景配置
+ * 3. 设置背景
+ * 4. 创建 AI 语音聊天房间（StartVoiceChat）
+ * 5. 开始对话
  */
 async function selectScene(sceneId) {
     console.log('🎪 Selecting scene:', sceneId);
+    
+    // 离开之前的房间（如果有）
+    if (currentRoomId) {
+        console.log('👋 Leaving previous room...');
+        await leaveAIVoiceChatRoom();
+    }
     
     currentScene = getScene(sceneId);
     currentDialogueIndex = 0;

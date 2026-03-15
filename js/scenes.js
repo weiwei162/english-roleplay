@@ -295,7 +295,12 @@ const scenes = {
 
 // 获取场景信息
 function getScene(sceneId) {
-    return scenes[sceneId] || scenes.zoo;
+    const scene = scenes[sceneId] || scenes.zoo;
+    // 添加 id 字段
+    return {
+        ...scene,
+        id: sceneId
+    };
 }
 
 // 获取所有场景列表

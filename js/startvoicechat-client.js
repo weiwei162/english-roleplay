@@ -77,6 +77,13 @@ class StartVoiceChatClient {
             console.log('✅ [1/5] RTC room created and joined');
             this.onStatusChange('room_created', '房间已创建');
             
+            // 触发就绪回调，让调用者知道可以加入 AI 了
+            this.onReady({
+                roomId: this.roomId,
+                userId: this.localUserId,
+                appId: this.appId
+            });
+            
             return { roomId: this.roomId, userId: this.localUserId, appId: this.appId };
             
         } catch (error) {
@@ -534,10 +541,20 @@ window.currentVoiceChat = null;
 
 /**
  * 创建 RTC 房间并加入（前端创建）
+ * 
+ * @param {string} roomId - 房间 ID
+ * @param {Object} options - 配置选项
+ * @param {boolean} options.fetchConfig - 是否从后端获取配置（默认 true）
+ * @param {string} options.appId - 直接指定 AppId（可选）
+ * @param {Function} options.onReady - 就绪回调
+ * @param {Function} options.onError - 错误回调
+ * @param {Function} options.onAIJoined - AI 加入回调
+ * @param {Function} options.onStatusChange - 状态变化回调
+ * @param {Function} options.onRemoteStream - 远端流回调
  */
-async function createStartVoiceChatRoom(roomId, appId, options = {}) {
+async function createStartVoiceChatRoom(roomId, options = {}) {
     window.currentVoiceChat = new StartVoiceChatClient({
-        appId: appId,
+        appId: options.appId,
         onReady: options.onReady || (() => {
             console.log('✅ Room created and ready');
         }),
@@ -557,8 +574,10 @@ async function createStartVoiceChatRoom(roomId, appId, options = {}) {
     });
     
     try {
-        // 步骤 1: 创建房间并加入
-        await window.currentVoiceChat.createRoom(roomId, appId);
+        // 步骤 1: 创建房间并加入（自动获取配置和 Token）
+        await window.currentVoiceChat.createRoom(roomId, {
+            fetchConfig: options.fetchConfig !== false
+        });
         
         return window.currentVoiceChat;
     } catch (error) {
