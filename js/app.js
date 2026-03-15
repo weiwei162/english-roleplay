@@ -291,11 +291,34 @@ function handleCharacterClick() {
 
 // ==================== ⭐ StartVoiceChat AI 语音对话集成 ====================
 
+/**
+ * StartVoiceChat 集成说明
+ * 
+ * 流程：
+ * 1. 用户选择场景 → selectScene()
+ * 2. 调用 createAIVoiceChatRoom()
+ * 3. 后端创建房间并启动 AI (火山 StartVoiceChat API)
+ * 4. 前端通过 RTC 加入房间
+ * 5. 实时对话开始
+ * 
+ * 数据流：
+ * 孩子说话 → RTC 音频流 → 火山云端 (ASR+LLM+TTS) → RTC 音频流 → 播放 AI 声音
+ * 
+ * ⚠️ 注意：不需要 WebSocket！不需要手动发送音频！
+ * 
+ * 参考文档：INTEGRATION-FLOW.md
+ */
+
 let currentRoomId = null;
 let currentAiTaskId = null;
-let isStartVoiceChatMode = true; // 使用 StartVoiceChat API
+let isStartVoiceChatMode = true;
 
-// 创建 AI 语音聊天房间（使用 StartVoiceChat API）
+/**
+ * 创建 AI 语音聊天房间（使用 StartVoiceChat API）
+ * 
+ * 调用时机：用户选择场景后
+ * 调用位置：selectScene() 函数中
+ */
 async function createAIVoiceChatRoom() {
     if (!currentCharacter || !currentScene) {
         console.warn('⚠️ Character or scene not selected');
@@ -303,37 +326,56 @@ async function createAIVoiceChatRoom() {
     }
     
     console.log('🏠 Creating StartVoiceChat room...');
+    console.log('   Character:', currentCharacter.id);
+    console.log('   Scene:', currentScene.id);
     
-    // 生成房间 ID
+    // 生成房间 ID（确保唯一性）
     currentRoomId = `room_${currentCharacter.id}_${currentScene.id}_${Date.now()}`;
     
     try {
         // 显示加载动画
         showVideoLoading();
+        updateRTCStatus('connecting', '正在连接 AI...');
         
-        // 使用 StartVoiceChat 客户端创建房间
+        // 使用 StartVoiceChat 客户端创建房间并加入
+        // 详细实现：js/startvoicechat-client.js
         await createStartVoiceChatRoom(
             currentRoomId,
             currentCharacter.id,
             {
+                // 就绪回调：AI 已加入房间，可以开始对话
                 onReady: (info) => {
                     console.log('✅ AI voice chat ready:', info);
                     currentAiTaskId = info.taskId;
                     hideVideoLoading();
                     updateRTCStatus('connected', 'AI 角色已就绪');
+                    
+                    // 开始对话（AI 会说欢迎词）
+                    console.log('🎤 Starting conversation...');
                 },
+                
+                // 错误回调：创建房间失败
                 onError: (error) => {
                     console.error('❌ Voice chat error:', error);
                     showVideoError(error.message);
                     updateRTCStatus('error', '连接失败');
+                    
+                    // 降级到本地对话模式
+                    console.log('📌 Fallback to local dialogue mode');
+                    isStartVoiceChatMode = false;
                 },
+                
+                // 状态变化回调
                 onStatusChange: (status, text) => {
+                    console.log('📊 RTC Status:', status, '-', text);
                     updateRTCStatus(status, text);
                 }
             }
         );
         
         console.log('✅ StartVoiceChat room created and joined');
+        console.log('   RoomId:', currentRoomId);
+        console.log('   TaskId:', currentAiTaskId);
         
     } catch (error) {
         console.error('❌ Failed to create StartVoiceChat room:', error);
@@ -343,15 +385,22 @@ async function createAIVoiceChatRoom() {
     }
 }
 
-// 离开 AI 语音聊天房间
+/**
+ * 离开 AI 语音聊天房间
+ * 
+ * 调用时机：用户离开场景或选择其他角色
+ */
 async function leaveAIVoiceChatRoom() {
     if (!currentRoomId) return;
     
+    console.log('👋 Leaving StartVoiceChat room:', currentRoomId);
+    
     try {
         // 离开 StartVoiceChat 房间
+        // 详细实现：js/startvoicechat-client.js
         await leaveStartVoiceChatRoom();
         
-        console.log('👋 Left StartVoiceChat room');
+        console.log('✅ Left StartVoiceChat room');
         
     } catch (error) {
         console.error('❌ Failed to leave room:', error);
@@ -364,7 +413,18 @@ async function leaveAIVoiceChatRoom() {
 
 // ==================== 选择场景 ====================
 
+/**
+ * 选择场景
+ * 
+ * 流程：
+ * 1. 加载场景配置
+ * 2. 设置背景
+ * 3. 创建 AI 语音聊天房间（StartVoiceChat）
+ * 4. 开始对话
+ */
 async function selectScene(sceneId) {
+    console.log('🎪 Selecting scene:', sceneId);
+    
     currentScene = getScene(sceneId);
     currentDialogueIndex = 0;
     
@@ -382,21 +442,26 @@ async function selectScene(sceneId) {
         characterPosition = { x: 50, y: 60 };
     }
     
+    // 切换到画布界面
     showScreen('canvas-screen');
     
     // 清空画布内容
     clearCanvasContent();
     
-    // ⭐ 新增：创建 RTC 房间并开启 AI 对话
+    // ⭐ 创建 AI 语音聊天房间（StartVoiceChat API）
+    // 这是关键步骤：后端创建房间，前端加入 RTC
+    console.log('🏠 Creating AI voice chat room...');
     try {
         await createAIVoiceChatRoom();
     } catch (error) {
         console.error('❌ Failed to create AI voice chat room:', error);
         // 降级到本地对话模式
-        console.log('📌 Using local dialogue mode');
+        console.log('📌 Using local dialogue mode (fallback)');
     }
     
     // 开始对话
+    // 注意：如果是 StartVoiceChat 模式，AI 会自动说欢迎词
+    // 本地模式会播放预定义的对话
     setTimeout(() => {
         startDialogue();
     }, 500);
@@ -781,26 +846,30 @@ function bindEvents() {
     console.log('✅ Events bound');
 }
 
-// RTC 配置
-const VOLC_APP_ID = 'YOUR_APP_ID'; // ⚠️ 替换为你的火山云 AppID
+// RTC 配置（StartVoiceChat 模式）
+// AppId 会从后端 API 返回，不需要硬编码
 let rtcInitialized = false;
 
-// RTC 初始化函数
+/**
+ * RTC 初始化函数
+ * 
+ * 注意：在 StartVoiceChat 模式下：
+ * - 不需要提前知道 AppId（从后端 API 返回）
+ * - 不需要手动加入房间（由 startvoicechat-client.js 处理）
+ * - 这里只是预检查 SDK 是否可用
+ */
 async function initRTC() {
     if (rtcInitialized) return;
 
     try {
         // 等待 SDK 加载
         await waitForRTCSdk();
-
-        // 初始化 RTC 客户端
-        initRTCAvatar(VOLC_APP_ID);
-
+        
         rtcInitialized = true;
-        console.log('✅ RTC initialized');
+        console.log('✅ RTC SDK ready for StartVoiceChat');
     } catch (error) {
         // SDK 不可用，使用动画模式
-        console.log('📌 Using animation mode (RTC not available)');
+        console.log('📌 RTC SDK not available, using animation mode');
         rtcInitialized = true; // 标记为已初始化，避免重试
     }
 }
@@ -809,13 +878,13 @@ async function initRTC() {
 function waitForRTCSdk() {
     return new Promise((resolve, reject) => {
         // SDK 已加载
-        if (window.VE_RTC) {
+        if (window.VERTC) {
             resolve();
             return;
         }
 
         // SDK 加载失败（被设为 null）
-        if (window.VE_RTC === null) {
+        if (window.VERTC === null) {
             console.warn('⚠️ RTC SDK not available');
             reject(new Error('RTC SDK not available'));
             return;
@@ -823,12 +892,12 @@ function waitForRTCSdk() {
 
         const checkInterval = setInterval(() => {
             // SDK 加载成功
-            if (window.VE_RTC) {
+            if (window.VERTC) {
                 clearInterval(checkInterval);
                 resolve();
             }
             // SDK 加载失败
-            if (window.VE_RTC === null) {
+            if (window.VERTC === null) {
                 clearInterval(checkInterval);
                 reject(new Error('RTC SDK not available'));
             }
@@ -838,9 +907,9 @@ function waitForRTCSdk() {
         setTimeout(() => {
             clearInterval(checkInterval);
             // 超时后标记为不可用
-            window.VE_RTC = null;
+            window.VERTC = null;
             reject(new Error('RTC SDK load timeout'));
-        }, 5000); // 缩短超时时间到 5 秒
+        }, 10000);
     });
 }
 
@@ -850,9 +919,26 @@ document.addEventListener('visibilitychange', function() {
     }
 });
 
-// ==================== WebSocket 集成 ====================
+// ==================== ⭐ StartVoiceChat 模式说明 ====================
 
-// DOMContentLoaded 处理
+/**
+ * 当前使用 StartVoiceChat 模式，不需要 WebSocket！
+ * 
+ * 集成流程：
+ * 1. 用户选择场景 → selectScene()
+ * 2. 调用 createAIVoiceChatRoom()
+ * 3. 后端创建房间并启动 AI (StartVoiceChat API)
+ * 4. 前端通过 RTC 加入房间
+ * 5. 实时对话开始（RTC 传输音频流）
+ * 
+ * 数据流：
+ * 孩子说话 → RTC 音频流 → 火山引擎云端 (ASR+LLM+TTS) → RTC 音频流 → 播放 AI 声音
+ * 
+ * 参考文档：INTEGRATION-FLOW.md
+ */
+
+// ==================== 初始化 ====================
+
 document.addEventListener('DOMContentLoaded', function() {
     // 基础初始化
     initSpeechRecognition();
@@ -860,23 +946,19 @@ document.addEventListener('DOMContentLoaded', function() {
     bindEvents();
     Memory.load();
     
-    // 初始化 RTC
+    // 初始化 RTC（用于 StartVoiceChat）
     initRTC();
     
-    // 语音合成配置
+    // 语音合成配置（备用方案，本地 TTS）
     if ('speechSynthesis' in window) {
         speechSynthesis.onvoiceschanged = function() {
             speechSynthesis.getVoices();
         };
     }
     
-    // ⭐ 初始化 WebSocket（延迟 1 秒确保页面加载完成）
-    setTimeout(() => {
-        if (window.initWebSocket) {
-            console.log('🔌 Initializing WebSocket...');
-            window.initWebSocket();
-        }
-    }, 1000);
+    // ⚠️ 注意：StartVoiceChat 模式下不需要 WebSocket
+    // WebSocket 相关代码已弃用，保留用于降级方案
+    console.log('✅ App initialized in StartVoiceChat mode');
 });
 
 // ==================== 麦克风控制（RTC 模式） ====================
