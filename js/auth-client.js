@@ -137,16 +137,15 @@ window.authClient = new AuthClient();
  * 显示登录界面
  */
 function showLoginScreen() {
-    const loginScreen = document.getElementById('login-screen');
-    if (loginScreen) {
-        loginScreen.classList.add('active');
-    }
+    console.log('🔐 Showing login screen');
+    showScreen('login-screen');
 }
 
 /**
  * 隐藏登录界面
  */
 function hideLoginScreen() {
+    console.log('🔐 Hiding login screen');
     const loginScreen = document.getElementById('login-screen');
     if (loginScreen) {
         loginScreen.classList.remove('active');
@@ -189,9 +188,9 @@ async function handleLogin(event) {
     const result = await window.authClient.login(username, password);
     
     if (result.success) {
-        hideLoginScreen();
+        console.log('✅ Login successful, switching to character select...');
+        showScreen('character-select');
         updateAuthUI();
-        alert(`欢迎回来，${username}！`);
     } else {
         alert(result.error || '登录失败，请重试');
     }
@@ -225,9 +224,9 @@ async function handleRegister(event) {
     const result = await window.authClient.register(username, password, parentEmail);
     
     if (result.success) {
-        hideLoginScreen();
+        console.log('✅ Registration successful, switching to character select...');
+        showScreen('character-select');
         updateAuthUI();
-        alert(`注册成功！欢迎加入，${username}！`);
     } else {
         alert(result.error || '注册失败，请重试');
     }

@@ -148,16 +148,36 @@ function speakCurrent() {
  * 注意：离开画布界面时需要离开 AI 房间
  */
 async function showScreen(screenId) {
+    console.log('📺 Switching to screen:', screenId);
+    
     // 如果离开画布界面，离开 AI 房间
     if (screenId !== 'canvas-screen' && currentRoomId) {
         console.log('👋 Leaving room when switching screen...');
         await leaveAIVoiceChatRoom();
     }
     
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
+    // 隐藏所有屏幕
+    document.querySelectorAll('.screen').forEach(s => {
+        s.classList.remove('active');
+        console.log('  - Hidden:', s.id);
+    });
     
+    // 显示目标屏幕
+    const targetScreen = document.getElementById(screenId);
+    if (targetScreen) {
+        targetScreen.classList.add('active');
+        console.log('  + Shown:', screenId);
+    } else {
+        console.error('❌ Screen not found:', screenId);
+    }
+    
+    // 特殊处理
     if (screenId === 'character-select') {
+        toggleSettings(false);
+    }
+    
+    if (screenId === 'login-screen') {
+        // 登录界面不显示设置按钮
         toggleSettings(false);
     }
 }
