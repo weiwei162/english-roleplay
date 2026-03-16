@@ -13,6 +13,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, CHARACTER_CONFIGS } = require('./volc-start-voicechat');
+const { combineCharacterAndScenePrompt, getScenePrompt } = require('./prompts');
 const { generateToken, generateWildcardToken, verifyToken } = require('./token-generator');
 require('dotenv').config();
 
@@ -148,9 +149,12 @@ app.get('/api/token', (req, res) => {
 
 app.post('/api/join-ai', async (req, res) => {
     try {
-        const { roomId, character, targetUserId } = req.body;
+        const { roomId, character, targetUserId, scene } = req.body;
         
-        console.log('\n🤖 AI joining room:', { roomId, character, targetUserId });
+        // 默认场景为 zoo
+        const sceneId = scene || 'zoo';
+        
+        console.log('\n🤖 AI joining room:', { roomId, character, targetUserId, scene: sceneId });
         
         if (!roomId || !character) {
             return res.status(400).json({ 
@@ -159,7 +163,9 @@ app.post('/api/join-ai', async (req, res) => {
             });
         }
         
-        const charConfig = CHARACTER_CONFIGS[character];
+        // 组合角色和场景提示词
+        const combinedConfig = combineCharacterAndScenePrompt(CHARACTER_CONFIGS[character], sceneId);
+        const sceneConfig = getScenePrompt(sceneId);
         
         // 生成任务 ID（确保唯一性）
         const taskId = `task_${roomId}_${Date.now()}`;
@@ -168,7 +174,7 @@ app.post('/api/join-ai', async (req, res) => {
         
         if (AI_MODE === 'component') {
             // ========== 分组件模式 ==========
-            console.log(`🔧 [分组件模式] AI joining room: ${roomId}`);
+            console.log(`🔧 [分组件模式] AI joining room: ${roomId}, Scene: ${sceneId}`);
             
             const config = getComponentConfig({
                 asrAppId: process.env.VOLC_ASR_APP_ID,
@@ -176,8 +182,8 @@ app.post('/api/join-ai', async (req, res) => {
                 llmEndpointId: process.env.VOLC_LLM_ENDPOINT_ID,
                 ttsAppId: process.env.VOLC_TTS_APP_ID,
                 ttsToken: process.env.VOLC_TTS_TOKEN,
-                ttsVoiceType: charConfig.ttsVoiceType,
-                systemPrompt: charConfig.systemPrompt,
+                ttsVoiceType: combinedConfig.ttsVoiceType,
+                systemPrompt: combinedConfig.systemPrompt,
                 asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
                 ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
             });
@@ -190,21 +196,21 @@ app.post('/api/join-ai', async (req, res) => {
                 asrConfig: config.ASRConfig,
                 llmConfig: config.LLMConfig,
                 ttsConfig: config.TTSConfig,
-                welcomeMessage: `Hi! I'm ${charConfig.name}. Let's learn English together!`,
+                welcomeMessage: sceneConfig.welcomeMessage,
                 idleTimeout: 180
             });
             
         } else {
             // ========== 端到端模式 ==========
-            console.log(`🎯 [端到端模式] AI joining room: ${roomId}`);
+            console.log(`🎯 [端到端模式] AI joining room: ${roomId}, Scene: ${sceneId}`);
             
             const config = getS2SConfig({
                 s2sAppId: process.env.VOLC_S2S_APP_ID,
                 s2sToken: process.env.VOLC_S2S_TOKEN,
                 modelVersion: process.env.VOLC_S2S_MODEL_VERSION || 'O',
-                systemRole: charConfig.systemRole,
-                speakingStyle: charConfig.speakingStyle,
-                speaker: charConfig.s2sSpeaker,
+                systemRole: combinedConfig.systemRole,
+                speakingStyle: combinedConfig.speakingStyle,
+                speaker: combinedConfig.s2sSpeaker,
                 outputMode: parseInt(process.env.VOLC_S2S_OUTPUT_MODE || '0')
             });
             
@@ -214,7 +220,7 @@ app.post('/api/join-ai', async (req, res) => {
                 taskId,
                 targetUserId,
                 s2sConfig: config,
-                welcomeMessage: `Hi! I'm ${charConfig.name}. Let's learn English together!`,
+                welcomeMessage: sceneConfig.welcomeMessage,
                 idleTimeout: 180
             });
         }

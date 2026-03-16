@@ -280,8 +280,8 @@ async function createAIVoiceChatRoom() {
                     console.log('✅ [1/4] Room created and joined');
                     updateRTCStatus('room_ready', '房间已创建，等待 AI 加入...');
                     
-                    // 步骤 2: 调用后端 API 将 AI 加入房间
-                    joinAIWithCharacter(currentCharacter.id);
+                    // 步骤 2: 调用后端 API 将 AI 加入房间（传递场景信息）
+                    joinAIWithCharacter(currentCharacter.id, currentScene.id);
                 },
                 
                 // AI 已加入回调
@@ -333,11 +333,12 @@ async function createAIVoiceChatRoom() {
 /**
  * 将 AI 角色加入房间（调用后端 API）
  */
-async function joinAIWithCharacter(character) {
-    console.log('🤖 Joining AI character:', character);
+async function joinAIWithCharacter(character, scene) {
+    const sceneId = scene || (currentScene ? currentScene.id : 'zoo');
+    console.log('🤖 Joining AI character:', character, 'Scene:', sceneId);
     
     try {
-        await joinAICharacter(character);
+        await joinAICharacter(character, sceneId);
         console.log('✅ AI character joined');
     } catch (error) {
         console.error('❌ Failed to join AI:', error);

@@ -155,9 +155,11 @@ class StartVoiceChatClient {
      * 步骤 2: 调用后端 API 将 AI 角色加入房间
      * 
      * @param {string} character - 角色 ID（emma/tommy/lily 等）
+     * @param {string} scene - 场景 ID（zoo/market/home/park），可选
      */
-    async joinAI(character) {
-        console.log('🤖 [2/5] Joining AI character to room...', { character, roomId: this.roomId });
+    async joinAI(character, scene) {
+        const sceneId = scene || 'zoo';
+        console.log('🤖 [2/5] Joining AI character to room...', { character, scene: sceneId, roomId: this.roomId });
         
         try {
             // 调用后端 API，将 AI 加入已创建的 RTC 房间
@@ -167,6 +169,7 @@ class StartVoiceChatClient {
                 body: JSON.stringify({
                     roomId: this.roomId,
                     character: character,
+                    scene: sceneId, // 传递场景信息
                     targetUserId: this.localUserId // 告诉 AI 要对话的用户
                 })
             });
