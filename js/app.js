@@ -942,8 +942,26 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     
+    // 检查登录状态
+    checkAuthAndShowScreen();
+    
     console.log('✅ App initialized in StartVoiceChat mode');
 });
+
+/**
+ * 检查认证状态并显示相应界面
+ */
+function checkAuthAndShowScreen() {
+    // 如果已登录，显示角色选择界面
+    if (window.authClient && window.authClient.isLoggedIn()) {
+        console.log('✅ User logged in:', window.authClient.getUsername());
+        showScreen('character-select');
+    } else {
+        // 未登录，显示登录界面
+        console.log('🔐 User not logged in, showing login screen');
+        showScreen('login-screen');
+    }
+}
 
 // ==================== 麦克风控制（RTC 模式） ====================
 

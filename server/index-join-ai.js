@@ -18,6 +18,7 @@ const http = require('http');
 const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, CHARACTER_CONFIGS } = require('./volc-start-voicechat');
 const { combineCharacterAndScenePrompt, getScenePrompt } = require('./prompts');
 const { generateToken, generateWildcardToken, verifyToken } = require('./token-generator');
+const { register, login, authMiddleware, optionalAuth } = require('./auth');
 require('dotenv').config();
 
 const app = express();
@@ -67,12 +68,117 @@ app.get('/health', (req, res) => {
         config: {
             aiMode: AI_MODE,
             volcConfigured: !!(process.env.VOLC_ACCESS_KEY && process.env.VOLC_SECRET_KEY),
-            rtcConfigured: !!(process.env.VOLC_APP_ID && process.env.VOLC_APP_KEY)
+            rtcConfigured: !!(process.env.VOLC_APP_ID && process.env.VOLC_APP_KEY),
+            authEnabled: true
         },
         activeSessions: sessions.size,
         flow: 'frontend-creates-room'
     });
 });
+
+// ==================== 🔐 认证接口 ====================
+
+/**
+ * 用户注册
+ */
+app.post('/api/auth/register', (req, res) => {
+    const { username, password, parentEmail } = req.body;
+    
+    // 验证输入
+    if (!username || !password) {
+        return res.status(400).json({
+            success: false,
+            error: 'Username and password are required'
+        });
+    }
+    
+    if (username.length < 3) {
+        return res.status(400).json({
+            success: false,
+            error: 'Username must be at least 3 characters'
+        });
+    }
+    
+    if (password.length < 4) {
+        return res.status(400).json({
+            success: false,
+            error: 'Password must be at least 4 characters'
+        });
+    }
+    
+    const result = register(username, password, parentEmail || '');
+    
+    if (result.success) {
+        console.log(`✅ User registered: ${username}`);
+        res.json(result);
+    } else {
+        console.log(`❌ Register failed: ${result.error}`);
+        res.status(400).json(result);
+    }
+});
+
+/**
+ * 用户登录
+ */
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({
+            success: false,
+            error: 'Username and password are required'
+        });
+    }
+    
+    const result = login(username, password);
+    
+    if (result.success) {
+        console.log(`✅ User logged in: ${username}`);
+        res.json(result);
+    } else {
+        console.log(`❌ Login failed: ${result.error}`);
+        res.status(401).json(result);
+    }
+});
+
+/**
+ * 获取当前用户信息
+ */
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+    res.json({
+        success: true,
+        user: req.user
+    });
+});
+
+/**
+ * 验证 Token（公开接口，用于前端检查登录状态）
+ */
+app.post('/api/auth/verify', (req, res) => {
+    const { token } = req.body;
+    
+    if (!token) {
+        return res.status(400).json({
+            success: false,
+            error: 'Token is required'
+        });
+    }
+    
+    const decoded = verifyToken(token);
+    
+    if (decoded) {
+        res.json({
+            success: true,
+            user: decoded
+        });
+    } else {
+        res.status(401).json({
+            success: false,
+            error: 'Invalid or expired token'
+        });
+    }
+});
+
 
 // ==================== ⭐ 获取前端配置（新接口） ====================
 
@@ -155,11 +261,14 @@ app.get('/api/token', (req, res) => {
     }
 });
 
-// ==================== ⭐ AI 加入房间（新接口） ====================
+// ==================== ⭐ AI 加入房间（需要登录） ====================
 
-app.post('/api/join-ai', async (req, res) => {
+app.post('/api/join-ai', optionalAuth, async (req, res) => {
     try {
         const { roomId, character, targetUserId, scene } = req.body;
+        
+        // 记录用户信息（如果已登录）
+        const userId = req.user ? req.user.username : 'anonymous';
         
         // 默认场景为 zoo
         const sceneId = scene || 'zoo';
@@ -241,6 +350,8 @@ app.post('/api/join-ai', async (req, res) => {
             taskId,
             targetUserId,
             aiMode: AI_MODE,
+            userId,
+            scene: sceneId,
             createdAt: Date.now()
         });
         

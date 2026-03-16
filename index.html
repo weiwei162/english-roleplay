@@ -12,8 +12,52 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- 🔐 登录界面 -->
+        <div id="login-screen" class="screen">
+            <div class="auth-container">
+                <h1 id="form-title">👋 欢迎回来</h1>
+                <p class="subtitle">Welcome to English Friend!</p>
+                
+                <!-- 登录表单 -->
+                <form id="login-form" class="auth-form" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" id="login-username" placeholder="请输入用户名" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="login-password" placeholder="请输入密码" required>
+                    </div>
+                    <button type="submit" class="auth-btn">登录</button>
+                    <p class="auth-switch">
+                        还没有账号？<a href="#" onclick="toggleAuthForm('register')">立即注册</a>
+                    </p>
+                </form>
+                
+                <!-- 注册表单 -->
+                <form id="register-form" class="auth-form" style="display:none;" onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" id="register-username" placeholder="至少 3 个字符" required minlength="3">
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="register-password" placeholder="至少 4 个字符" required minlength="4">
+                    </div>
+                    <div class="form-group">
+                        <label>家长邮箱（可选）</label>
+                        <input type="email" id="register-email" placeholder="parent@example.com">
+                    </div>
+                    <button type="submit" class="auth-btn">注册</button>
+                    <p class="auth-switch">
+                        已有账号？<a href="#" onclick="toggleAuthForm('login')">返回登录</a>
+                    </p>
+                </form>
+            </div>
+        </div>
+        
         <!-- 角色选择界面 -->
-        <div id="character-select" class="screen active">
+        <div id="character-select" class="screen">
             <h1>👋 选一个好朋友吧！</h1>
             <p class="subtitle">Choose a friend to talk with!</p>
             <div class="character-grid">
@@ -151,6 +195,8 @@
             <div class="settings-panel" id="settings-panel">
                 <div class="settings-content">
                     <h3>⚙️ 设置</h3>
+                    <div id="auth-status" class="auth-status">未登录</div>
+                    <button id="login-btn" onclick="showLoginScreen()">🔐 登录/注册</button>
                     <button onclick="clearMemory()">🗑️ 清除记忆</button>
                     <button onclick="showScreen('scene-select')">🎪 换个场景</button>
                     <button onclick="showScreen('character-select')">👋 换个朋友</button>
@@ -160,6 +206,9 @@
         </div>
     </div>
 
+    <!-- 🔐 认证模块 -->
+    <script src="js/auth-client.js"></script>
+    
     <!-- 核心模块 -->
     <script src="js/characters.js"></script>
     <script src="js/scenes.js"></script>
