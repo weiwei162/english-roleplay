@@ -250,7 +250,8 @@ app.post('/api/join-ai', async (req, res) => {
             roomId,
             taskId,
             character,
-            characterName: charConfig.name,
+            characterName: CHARACTER_CONFIGS[character].name,
+            scene: sceneId,
             aiMode: AI_MODE,
             success: true,
             message: 'AI character joined room successfully'

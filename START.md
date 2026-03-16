@@ -98,7 +98,8 @@ npm test
 
 ### 5️⃣ 浏览器访问
 
-打开浏览器访问：**http://localhost:3000**
+**HTTP 模式：** http://localhost:3000  
+**HTTPS 模式：** https://localhost:3443（需配置）
 
 **使用流程：**
 1. 选择角色（Miss Emma 👩‍🏫）
@@ -106,6 +107,39 @@ npm test
 3. 点击"开始对话"
 4. 对着麦克风说英语
 5. 听 AI 实时回复
+
+---
+
+## 🔐 启用 HTTPS（可选）
+
+### 生成证书
+
+```bash
+cd server
+./generate-ssl.sh
+```
+
+### 配置环境变量
+
+```bash
+echo "USE_HTTPS=true" >> .env
+```
+
+### 重启服务
+
+```bash
+npm start
+```
+
+### 访问
+
+```
+https://localhost:3443
+```
+
+> 💡 **注意：** 自签名证书会显示安全警告，点击"继续访问"即可。
+
+**详细配置：** [`HTTPS-CONFIG.md`](HTTPS-CONFIG.md)
 
 ---
 

@@ -27,8 +27,23 @@ npm install
 cp .env.example .env
 # 编辑 .env 填入 API 凭证
 npm start
-# 访问：http://localhost:3000
+# 访问：http://localhost:3000 (或 https://localhost:3443)
 ```
+
+### 🔐 启用 HTTPS（可选）
+
+```bash
+# 生成自签名证书（开发环境）
+./generate-ssl.sh
+
+# 启用 HTTPS
+echo "USE_HTTPS=true" >> .env
+npm start
+
+# 访问：https://localhost:3443
+```
+
+详见：[`HTTPS-CONFIG.md`](HTTPS-CONFIG.md)
 
 ---
 
