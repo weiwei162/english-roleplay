@@ -928,7 +928,6 @@ document.addEventListener('visibilitychange', async function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     // 基础初始化
-    initSpeechRecognition();
     initAudio();
     bindEvents();
     Memory.load();
@@ -943,8 +942,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     
-    // ⚠️ 注意：StartVoiceChat 模式下不需要 WebSocket
-    // WebSocket 相关代码已弃用，保留用于降级方案
     console.log('✅ App initialized in StartVoiceChat mode');
 });
 
