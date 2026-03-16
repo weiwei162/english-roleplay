@@ -12,6 +12,9 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const https = require('https');
+const http = require('http');
 const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, CHARACTER_CONFIGS } = require('./volc-start-voicechat');
 const { combineCharacterAndScenePrompt, getScenePrompt } = require('./prompts');
 const { generateToken, generateWildcardToken, verifyToken } = require('./token-generator');
@@ -25,6 +28,13 @@ app.use(express.json());
 
 const AI_MODE = process.env.AI_MODE || 's2s'; // 'component' 或 's2s'
 const PORT = parseInt(process.env.PORT) || 3000;
+
+// HTTPS 配置
+const USE_HTTPS = process.env.USE_HTTPS === 'true';
+const HTTPS_PORT = parseInt(process.env.HTTPS_PORT) || 3443;
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH || './ssl/cert.pem';
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH || './ssl/key.pem';
+
 const frontendPath = path.join(__dirname, '..');
 
 // 初始化客户端
@@ -324,12 +334,88 @@ app.get('*', (req, res) => {
 
 // ==================== 启动服务 ====================
 
-const server = app.listen(PORT, () => {
-    console.log(`
+// 创建 HTTP 重定向服务器（HTTPS 模式下）
+let httpServer;
+let httpsServer;
+
+if (USE_HTTPS) {
+    // 读取 SSL 证书
+    let sslOptions;
+    try {
+        sslOptions = {
+            key: fs.readFileSync(SSL_KEY_PATH),
+            cert: fs.readFileSync(SSL_CERT_PATH)
+        };
+        console.log('✅ SSL 证书加载成功');
+    } catch (error) {
+        console.error('❌ SSL 证书加载失败:', error.message);
+        console.log('⚠️  降级到 HTTP 模式');
+        sslOptions = null;
+    }
+    
+    if (sslOptions) {
+        // 创建 HTTPS 服务器
+        httpsServer = https.createServer(sslOptions, app);
+        
+        httpsServer.listen(HTTPS_PORT, () => {
+            console.log(`
+╔══════════════════════════════════════════════════════╗
+║   English Friend - StartVoiceChat Server             ║
+║   (Frontend Creates Room Flow) - HTTPS Mode          ║
+║                                                      ║
+║   🔒 Protocol:  HTTPS                                ║
+║   🌐 Frontend:  https://localhost:${HTTPS_PORT}${' '.repeat(33 - String(HTTPS_PORT).length)}║
+║   📡 API:       https://localhost:${HTTPS_PORT}/api${' '.repeat(29 - String(HTTPS_PORT).length)}║
+║   🔑 Health:    https://localhost:${HTTPS_PORT}/health${' '.repeat(28 - String(HTTPS_PORT).length)}║
+║                                                      ║
+║   🤖 AI Mode:   ${AI_MODE === 'component' ? '分组件 (ASR+LLM+TTS)' : '端到端 (S2S)'}${' '.repeat(23 - (AI_MODE === 'component' ? 16 : 9))}║
+║   🎮 RTC:       ${process.env.VOLC_APP_ID ? '✅ configured' : '❌ not configured'}${' '.repeat(23 - (process.env.VOLC_APP_ID ? 14 : 17))}║
+║   🔄 Flow:      Frontend → Create Room → AI Joins    ║
+║                                                      ║
+║   ✨ API Endpoints:                                   ║
+║   - POST /api/join-ai    (AI joins room)             ║
+║   - POST /api/leave-room (Leave & stop AI)           ║
+║   - GET  /api/characters (Get character list)        ║
+║   - GET  /api/token      (Get RTC token)             ║
+║                                                      ║
+║   ✨ 5 种角色：Emma, Tommy, Lily, Mike, Rose          ║
+╚══════════════════════════════════════════════════════╝
+
+🚀 HTTPS 服务已启动！
+📱 浏览器访问：https://localhost:${HTTPS_PORT}
+🔧 模式：${AI_MODE === 'component' ? '分组件' : '端到端'}
+🔄 流程：前端创建房间 → AI 加入
+🔐 SSL 证书：${SSL_CERT_PATH}
+            `);
+        });
+        
+        // 创建 HTTP 服务器用于重定向
+        httpServer = http.createServer((req, res) => {
+            res.writeHead(301, { 'Location': `https://localhost:${HTTPS_PORT}${req.url}` });
+            res.end();
+        });
+        
+        httpServer.listen(PORT, () => {
+            console.log(`🔀 HTTP 重定向：http://localhost:${PORT} → https://localhost:${HTTPS_PORT}`);
+        });
+    } else {
+        // 降级到 HTTP 模式
+        startHttpServer();
+    }
+} else {
+    // 纯 HTTP 模式
+    startHttpServer();
+}
+
+// 启动 HTTP 服务器
+function startHttpServer() {
+    const server = app.listen(PORT, () => {
+        console.log(`
 ╔══════════════════════════════════════════════════════╗
 ║   English Friend - StartVoiceChat Server             ║
 ║   (Frontend Creates Room Flow)                       ║
 ║                                                      ║
+║   🔒 Protocol:  HTTP (Insecure)                      ║
 ║   🌐 Frontend:  http://localhost:${PORT}${' '.repeat(34 - String(PORT).length)}║
 ║   📡 API:       http://localhost:${PORT}/api${' '.repeat(30 - String(PORT).length)}║
 ║   🔑 Health:    http://localhost:${PORT}/health${' '.repeat(29 - String(PORT).length)}║
@@ -351,28 +437,39 @@ const server = app.listen(PORT, () => {
 📱 浏览器访问：http://localhost:${PORT}
 🔧 模式：${AI_MODE === 'component' ? '分组件' : '端到端'}
 🔄 流程：前端创建房间 → AI 加入
-    `);
-});
+        `);
+    });
+    
+    // 优雅关闭
+    process.on('SIGTERM', () => gracefulShutdown(server));
+    process.on('SIGINT', () => gracefulShutdown(server));
+}
 
-// 优雅关闭
-process.on('SIGTERM', async () => {
+// 优雅关闭函数
+function gracefulShutdown(server) {
     console.log('\n👋 正在关闭服务...');
     
     // 关闭所有活跃会话
     for (const [roomId, session] of sessions) {
         try {
-            await client.stopVoiceChat({
+            client.stopVoiceChat({
                 appId: process.env.VOLC_APP_ID,
                 roomId,
                 taskId: session.taskId
             });
         } catch (e) {
-            console.error(`❌ 关闭房间 ${roomId} 失败:`, e.message);
+            console.error(`❌ 关闭房间 ${roomId} 失败：`, e.message);
         }
     }
     
     server.close(() => {
+        // 如果启用了 HTTPS，也关闭 HTTP 服务器
+        if (httpServer) {
+            httpServer.close();
+        }
         console.log('✅ 服务已关闭');
         process.exit(0);
     });
-});
+}
+
+
