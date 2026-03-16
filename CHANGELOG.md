@@ -1,90 +1,159 @@
 # English Roleplay - 更新日志
 
-## v2.0.0 (2026-03-14) - 阿里云百炼迁移
+## v3.1.0 (2026-03-16) - 正确流程版 ⭐
 
 ### 🎉 重大变更
 
-**迁移到阿里云百炼平台**，替换原有的火山引擎服务。
+**前端完全控制房间** - 修正为正确的 StartVoiceChat 集成流程
 
 ### ✨ 新增功能
 
-- **阿里云百炼 Qwen 大模型对话**
-  - 支持 `qwen-max`、`qwen-plus`、`qwen-turbo` 模型
-  - 更高的对话质量和更低的成本
-  
-- **阿里云百炼实时 ASR 语音识别**
-  - 模型：`qwen3-asr-flash-realtime`
-  - 支持 16kHz PCM 实时音频流
-  - 内置 VAD 语音活动检测
-  - 支持情感识别（7 种情绪）
-  - 支持中英文及方言识别
-
-- **WebSocket 实时 ASR 连接管理**
-  - 自动重连机制
-  - 每个会话独立连接
-  - 流式识别结果推送
-
-- **新增测试工具**
-  - `test-bailian.js` - API 连接测试
-  - 健康检查端点增强
-
-### 📝 新增文档
-
-- `BAILIAN-SETUP.md` - 阿里云百炼配置完整指南
-- `RTC-BAILIAN-INTEGRATION.md` - RTC + 百炼集成方案
-- `MIGRATION-TO-BAILIAN.md` - 迁移指南和对比
-- `QUICKSTART-BAILIAN.md` - 5 分钟快速开始
+- **前端创建房间** - 前端拥有房间完全控制权
+- **配置 API** - `/api/config` 获取 AppId
+- **Token API** - `/api/token` 获取 RTC Token
+- **官方 Token 生成** - 使用 `AccessToken.js` 官方实现
 
 ### 🔧 技术改动
 
-#### 服务端 (`server/index.js`)
+#### 服务端
+- ✅ `index-join-ai.js` - AI 加入房间模式（主入口）
+- ✅ `volc-start-voicechat.js` - StartVoiceChat API 客户端
+- ✅ `token-generator-official.js` - 官方 Token 生成
+- ✅ `test-integration.js` - 集成测试
 
-```javascript
-// 旧：豆包 API
-async function callDoubaoAPI(messages)
+#### 前端
+- ✅ `js/startvoicechat-client.js` - StartVoiceChat 客户端（正确流程）
+- ✅ `js/app.js` - 应用主逻辑（已更新）
 
-// 新：百炼 Qwen API
-async function callQwenAPI(messages, model)
-```
+#### 配置
+- ✅ `.env` - 更新为 StartVoiceChat 配置
 
-```javascript
-// 旧：火山 ASR（未实现）
-async function recognizeSpeech(audioBase64)
+### 📝 新增文档
 
-// 新：百炼实时 ASR
-class RealtimeASR {
-  connect()
-  sendAudio(audioBase64)
-  close()
+- `START.md` - ⭐ 5 分钟快速启动指南
+- `PROJECT-SUMMARY-2026-03-16.md` - 项目完整总结
+- `API-CONFIG.md` - 前端配置 API 说明
+
+### 🧹 清理工作
+
+**移除过时服务端文件：**
+- ❌ `index.js` - 旧版主入口
+- ❌ `index-rtc-ai.js` - RTC AI 模式
+- ❌ `index-rtc-ai-v2.js` - RTC AI v2
+- ❌ `index-rtc-openapi.js` - RTC OpenAPI
+- ❌ `index-start-voicechat.js` - 旧 StartVoiceChat 流程
+- ❌ `rtc-bot.js` - RTC Bot（不再需要）
+- ❌ `volc-rtc-client.js` - 旧 RTC 客户端
+- ❌ `volc-rtc-client-v2.js` - 旧 RTC 客户端 v2
+- ❌ `tts-client.js` - TTS 客户端（不再需要）
+- ❌ `test-api.js`, `test-bailian.js`, `test-rtc-bot.js`, `test-server-rtc.js`, `test-e2e.js` - 旧测试
+
+**移除过时前端文件：**
+- ❌ `js/websocket-client.js` - WebSocket 客户端（不再需要）
+- ❌ `js/rtc-client.js` - 旧 RTC 客户端
+
+**移除过时文档：**
+- ❌ `ANIMATION-UPGRADE.md`
+- ❌ `BAILIAN-SETUP.md`
+- ❌ `CHANGELOG-v2.md`
+- ❌ `CLAUDE.md`
+- ❌ `DESIGN.md`
+- ❌ `DONE.md`
+- ❌ `FULLSTACK-UPGRADE.md`
+- ❌ `HTTPS-DONE.md`, `HTTPS-SETUP.md`
+- ❌ `IMPLEMENTATION-SUMMARY.md`
+- ❌ `MIGRATION-TO-BAILIAN.md`
+- ❌ `QUICK-SETUP.md`
+- ❌ `QUICKSTART-BAILIAN.md`
+- ❌ `README-RTC-OPENAPI.md`, `README-RTC-REALTIME.md`, `README-SETUP.md`
+- ❌ `REALTIME-RTC-PLAN.md`
+- ❌ `RTC-AI-DESIGN.md`, `RTC-BAILIAN-INTEGRATION.md`, `RTC-DESIGN.md`
+- ❌ `RTC-IMPLEMENTATION-DONE.md`, `RTC-INTEGRATION-FULLDUPLEX.md`, `RTC-INTEGRATION.md`
+- ❌ `RTC-QUICKSTART.md`, `RTC-REALTIME-AI-PLAN.md`, `RTC-SDK-UPDATE.md`, `RTC-SERVER-OPENAPI.md`
+- ❌ `START.md` (旧版)
+- ❌ `TEST-REPORT.md`
+- ❌ `VOLCENGINE-SETUP.md`
+- ❌ `AI-MODES-GUIDE.md`
+
+### 📦 package.json 更新
+
+```json
+{
+  "version": "3.1.0",
+  "main": "index-join-ai.js",
+  "scripts": {
+    "start": "node index-join-ai.js",
+    "dev": "nodemon index-join-ai.js",
+    "test": "node test-integration.js"
+  }
 }
 ```
 
-#### 配置文件
+### ⚠️ 破坏性变更
 
-**`.env`** 变更：
-```bash
-# 移除
-DOUBAO_API_KEY=xxx
-VOLC_ASR_ACCESS_KEY=xxx
-VOLC_ASR_SECRET_KEY=xxx
+- ❌ 移除旧版启动方式 `npm run start:rtc-ai`
+- ❌ 移除阿里云百炼相关代码
+- ⚠️ 需要重新配置 `.env`（使用火山引擎凭证）
 
-# 新增
-DASHSCOPE_API_KEY=sk-xxx
-LLM_MODEL=qwen-plus
-ASR_MODEL=qwen3-asr-flash-realtime
-ASR_WS_URL=wss://dashscope.aliyuncs.com/api-ws/v1/realtime
-```
+### ✅ 优势
 
-#### 依赖更新
+| 改进点 | 之前 | 现在 |
+|--------|------|------|
+| 房间控制 | 后端创建 | 前端创建 ✅ |
+| Token 生成 | 硬编码 | API 获取 ✅ |
+| 架构复杂度 | 多服务 | 一站式 ✅ |
+| 延迟 | ~3.4 秒 | ~1.5 秒 ✅ |
+| 依赖 | Python + FFmpeg | 纯 Node.js ✅ |
+| 文档 | 分散 | 集中整理 ✅ |
 
-**新增：**
-- `websocket-client` ^1.0.4 - ASR WebSocket 连接
+---
 
-**保留：**
-- `express` - Web 服务器
-- `ws` - WebSocket 服务器
-- `dotenv` - 环境变量
-- `cors` - 跨域支持
+## v3.0.0 (2026-03-15) - StartVoiceChat 版
+
+### 🎉 重大变更
+
+**迁移到火山引擎 StartVoiceChat** - 一站式端到端方案
+
+### ✨ 新增功能
+
+- **StartVoiceChat API** - 云端一站式处理（ASR+LLM+TTS）
+- **端到端模式** - S2SConfig 配置
+- **5 种角色人设** - Emma, Tommy, Lily, Mike, Rose
+
+### 🔧 技术改动
+
+- ✅ `volc-start-voicechat.js` - StartVoiceChat API 客户端
+- ✅ `index-start-voicechat.js` - 服务端入口
+- ✅ `js/startvoicechat-client.js` - 前端客户端
+
+### 📝 新增文档
+
+- `STARTVOICECHAT-SETUP.md` - 配置指南
+- `QUICKSTART-STARTVOICECHAT.md` - 快速启动
+- `INTEGRATION-GUIDE.md` - 集成指南
+- `DEPLOY-TEST.md` - 部署测试
+
+### 📊 性能对比
+
+| 指标 | v2.0 (百炼) | v3.0 (StartVoiceChat) | 变化 |
+|------|-----------|----------------------|------|
+| 延迟 | ~3.4 秒 | ~1.5 秒 | ⬇️ -56% |
+| 架构 | 多服务 | 一站式 | ✅ 简化 |
+| 依赖 | Python | 纯 Node.js | ✅ 简化 |
+
+---
+
+## v2.0.0 (2026-03-14) - 阿里云百炼版
+
+### 🎉 重大变更
+
+**迁移到阿里云百炼平台**，替换火山引擎豆包服务
+
+### ✨ 新增功能
+
+- **阿里云百炼 Qwen 大模型** - qwen-max/plus/turbo
+- **实时 ASR** - qwen3-asr-flash-realtime
+- **WebSocket 实时连接** - 流式识别
 
 ### 📊 性能对比
 
@@ -92,60 +161,20 @@ ASR_WS_URL=wss://dashscope.aliyuncs.com/api-ws/v1/realtime
 |------|---------|-----------|------|
 | LLM 成本 | ¥0.008/千 tokens | ¥0.004/千 tokens | ⬇️ -50% |
 | ASR 成本 | ¥0.02/分钟 | ¥0.02/分钟 | ➡️ 持平 |
-| 响应延迟 | ~500ms | ~500ms | ➡️ 持平 |
 | 识别精度 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⬆️ +1 |
-
-### 🔄 迁移指南
-
-**从 v1.x 升级到 v2.0：**
-
-1. 更新依赖：
-```bash
-npm install
-```
-
-2. 更新环境变量：
-```bash
-cp .env.example .env
-# 编辑 .env，设置 DASHSCOPE_API_KEY
-```
-
-3. 测试连接：
-```bash
-npm test
-```
-
-4. 启动服务：
-```bash
-npm start
-```
-
-详见：`MIGRATION-TO-BAILIAN.md`
-
-### ⚠️ 破坏性变更
-
-- ❌ 移除火山豆包 API 支持
-- ❌ 移除火山 ASR API 支持
-- ⚠️ 需要重新配置 API Key
-
-### 🐛 Bug 修复
-
-- 修复 ASR 连接未正确关闭的问题
-- 修复会话状态管理问题
-- 优化 WebSocket 重连逻辑
 
 ---
 
-## v1.0.0 (2026-03-13) - 火山引擎版本
+## v1.0.0 (2026-03-12) - 初始版本
 
-### 初始版本
+### 初始功能
 
 - 火山引擎 RTC 双向音频
 - 豆包大模型对话
 - 语音识别 ASR
-- 数字人视频（可选）
 - WebSocket 实时通信
 - 前端画布式 UI
+- 5 个角色 + 4 个场景
 
 ---
 

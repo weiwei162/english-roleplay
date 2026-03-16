@@ -1,28 +1,18 @@
 {
-  "name": "english-friend-rtc-server",
-  "version": "2.0.0",
-  "description": "English Friend AI - Alibaba Bailian Edition",
-  "main": "index.js",
+  "name": "english-friend-server",
+  "version": "3.1.0",
+  "description": "English Friend AI - VolcEngine StartVoiceChat Edition",
+  "main": "index-join-ai.js",
   "scripts": {
-    "start": "node index.js",
-    "start:rtc-ai": "node index-rtc-ai.js",
-    "dev": "nodemon index.js",
-    "dev:rtc-ai": "nodemon index-rtc-ai.js",
-    "configure": "bash configure.sh",
-    "test": "node test-e2e.js",
-    "test:e2e": "node test-e2e.js",
-    "test:bailian": "node test-bailian.js",
-    "test:rtc": "node -e \"const {testRTCClient} = require('./volc-rtc-client'); testRTCClient()\"",
-    "test:doubao": "node -e \"require('./test-api.js'); testDoubaoAPI()\""
+    "start": "node index-join-ai.js",
+    "dev": "nodemon index-join-ai.js",
+    "test": "node test-integration.js"
   },
   "dependencies": {
     "@volcengine/rtc": "^4.68.1",
     "cors": "^2.8.5",
-    "crypto": "^1.0.1",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "websocket": "^1.0.34",
-    "ws": "^8.14.2"
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
@@ -31,13 +21,11 @@
     "node": ">=16.0.0"
   },
   "keywords": [
-    "alibaba",
-    "bailian",
-    "qwen",
-    "asr",
+    "volcengine",
+    "startvoicechat",
+    "rtc",
     "english-learning",
-    "ai-tutor",
-    "digital-human"
+    "ai-tutor"
   ],
   "author": "English Friend Team",
   "license": "MIT"

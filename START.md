@@ -1,256 +1,164 @@
-# 🚀 快速启动指南 - 全栈版
+# 🚀 English Friend - 快速启动指南
 
-**更新日期：** 2026-03-13  
-**版本：** v2.1 (统一 Node.js 全栈)
-
----
-
-## ⚡ 一句话启动
-
-```bash
-cd english-roleplay/server
-npm start
-
-# 浏览器访问
-http://localhost:3000
-```
-
-**就这么简单！** 🎉
+**版本：** v3.1.0 - StartVoiceChat 正确流程版  
+**更新时间：** 2026-03-16
 
 ---
 
-## 📋 详细步骤
+## ⚡ 5 分钟快速启动
 
-### 第一次启动
-
-#### 1. 安装依赖
+### 1️⃣ 安装依赖
 
 ```bash
-cd english-roleplay/server
+cd ~/projects/english-roleplay/server
 npm install
 ```
 
 ---
 
-#### 2. 配置 API（可选）
-
-**不配置也能用**（降级模式），配置后功能更完整：
+### 2️⃣ 配置环境变量
 
 ```bash
-# 运行配置脚本
-./configure.sh
-
-# 按提示输入：
-# - RTC AppID + AppKey
-# - 豆包 API Key
-# - （可选）ASR 密钥
+cp .env.example .env
 ```
+
+编辑 `.env` 文件：
+
+```bash
+# ==================== AI 模式 ====================
+AI_MODE=s2s
+
+# ==================== RTC 配置 ====================
+VOLC_APP_ID=你的 RTC AppId
+VOLC_APP_KEY=你的 RTC AppKey
+
+# ==================== API 凭证 ====================
+VOLC_ACCESS_KEY=你的 AccessKey
+VOLC_SECRET_KEY=你的 SecretKey
+
+# ==================== S2S 配置 ====================
+VOLC_S2S_APP_ID=你的 S2S AppId
+VOLC_S2S_TOKEN=你的 S2S Token
+
+# ==================== 服务端配置 ====================
+PORT=3000
+```
+
+> 💡 **获取凭证：** 登录 [火山引擎控制台](https://console.volcengine.com/) 创建应用并获取密钥
 
 ---
 
-#### 3. 测试配置
+### 3️⃣ 启动服务
 
 ```bash
-# 测试 API
-npm test
-
-# 看到 "✅ 所有测试通过" 即可继续
-```
-
----
-
-#### 4. 启动服务
-
-```bash
-# 正式运行
+# 生产环境
 npm start
 
-# 开发模式（自动重启）
+# 开发环境（自动重启）
 npm run dev
 ```
 
----
-
-#### 5. 打开浏览器
-
-```
-http://localhost:3000
-```
-
----
-
-## 🎯 启动成功标志
-
-看到以下输出表示成功：
-
+**预期输出：**
 ```
 ╔══════════════════════════════════════════════════════╗
-║     English Friend AI Server Running (Full-Stack)   ║
-║                                                      ║
-║   🌐 Frontend:  http://localhost:3000                ║
-║   🔌 WebSocket: ws://localhost:3000                  ║
-║   📡 API:       http://localhost:3000/api            ║
-║                                                      ║
-║   🎥 RTC:     ✅ configured                          ║
-║   🤖 Doubao:  ✅ configured                          ║
-║                                                      ║
-║   ✨ Features:                                        ║
-║   ✓ 前端静态文件服务（无需 Python）                    ║
-║   ✓ 双向 RTC 音频流（孩子说话 → AI）                   ║
-║   ✓ 实时 ASR 语音识别                                 ║
-║   ✓ 豆包大模型对话生成                               ║
-║   ✓ 数字人视频推流                                   ║
+║   English Friend - StartVoiceChat Server             ║
+║   (Frontend Creates Room Flow)                       ║
 ╚══════════════════════════════════════════════════════╝
 
-🚀 现在只需一个命令启动所有服务！
-📱 浏览器访问：http://localhost:3000
+📁 Serving frontend from: /home/gem/projects/english-roleplay
+🤖 AI Mode: s2s
+🔄 Flow: Frontend creates room → AI joins via backend
+
+🚀 Server running on http://localhost:3000
 ```
 
 ---
 
-## 🧪 测试流程
-
-### 1. 基础测试（无需 API）
-
-```
-1. 打开 http://localhost:3000
-2. 选择角色（Miss Emma 等）
-3. 选择场景（动物园、超市等）
-4. 点击快速回复按钮
-5. 看到对话气泡和字幕
-```
-
-**预期结果：** ✅ 正常显示对话
-
----
-
-### 2. WebSocket 测试（需要服务端）
-
-打开浏览器控制台：
-
-```javascript
-// 检查 WebSocket 状态
-getWebSocketStatus()
-// 应该返回 "connected"
-
-// 发送测试消息
-sendWebSocketText("Hello!")
-```
-
-**预期结果：** ✅ 收到 AI 回应
-
----
-
-### 3. RTC 测试（需要 API 配置）
-
-```
-1. 点击"按住说话"
-2. 允许麦克风权限
-3. 说话 "Hello"
-4. 看到音量指示器跳动
-5. 收到 AI 回应和数字人视频
-```
-
-**预期结果：** ✅ 双向音频流正常工作
-
----
-
-## 🛠️ 开发模式
-
-### 自动重启（推荐）
+### 4️⃣ 运行测试
 
 ```bash
-cd server
-npm run dev
+npm test
 ```
 
-**特点：**
-- ✅ 修改代码自动重启
-- ✅ 无需手动停止/启动
-- ✅ 开发体验更好
+**预期输出：**
+```
+🧪 StartVoiceChat 前后端集成测试
+
+✅ 测试 1: 健康检查 - 通过
+✅ 测试 2: 角色列表 - 通过
+✅ 测试 3: 创建房间 - 通过
+✅ 测试 4: 离开房间 - 通过
+✅ 测试 5: 前端静态文件 - 通过
+✅ 测试 6: StartVoiceChat 客户端 - 通过
+
+🎉 所有测试通过！
+```
 
 ---
 
-### 调试模式
+### 5️⃣ 浏览器访问
 
+打开浏览器访问：**http://localhost:3000**
+
+**使用流程：**
+1. 选择角色（Miss Emma 👩‍🏫）
+2. 选择场景（魔法动物园 🦁）
+3. 点击"开始对话"
+4. 对着麦克风说英语
+5. 听 AI 实时回复
+
+---
+
+## 📡 API 接口
+
+### 健康检查
 ```bash
-# 查看详细日志
-DEBUG=* npm start
-
-# 或者在代码中添加
-console.log('Debug info...')
+curl http://localhost:3000/health
 ```
 
----
-
-## 📊 端口说明
-
-**之前（两个端口）：**
-```
-前端：8080 (Python)
-后端：3000 (Node.js)
-```
-
-**现在（一个端口）：**
-```
-全部：3000 (Node.js 全栈)
-```
-
----
-
-## 🔧 修改端口
-
-如需修改默认端口：
-
+### 获取配置
 ```bash
-# 方法 1：环境变量
-PORT=8080 npm start
-
-# 方法 2：修改 .env
-echo "PORT=8080" >> .env
+curl http://localhost:3000/api/config
 ```
 
----
-
-## 🐛 常见问题
-
-### Q1: 页面空白
-
+### 获取 Token
 ```bash
-# 检查服务是否启动
-curl http://localhost:3000
-
-# 应该返回 index.html 内容
+curl "http://localhost:3000/api/token?roomId=room123&uid=child_user"
 ```
 
----
-
-### Q2: WebSocket 连接失败
-
-```javascript
-// 检查 WebSocket URL
-console.log(WS_CONFIG.url)
-// 应该是 ws://localhost:3000
-
-// 手动重连
-reconnectWebSocket()
-```
-
----
-
-### Q3: API 配置错误
-
+### 角色列表
 ```bash
-# 重新配置
-./configure.sh
-
-# 或者手动编辑 .env
-nano .env
+curl http://localhost:3000/api/characters
 ```
 
 ---
 
-### Q4: 端口被占用
+## 🎭 可用角色
+
+| 角色 | 说明 |
+|------|------|
+| Emma | Miss Emma - 温柔的英语老师 |
+| Tommy | Tommy - 5 岁美国小男孩 |
+| Lily | Lily - 7 岁活泼小姐姐 |
+| Mike | Coach Mike - 阳光运动教练 |
+| Rose | Grandma Rose - 慈祥老奶奶 |
+
+---
+
+## 🎪 可用场景
+
+| 场景 | 说明 |
+|------|------|
+| 魔法动物园 🦁 | 学习动物名称和叫声 |
+| 欢乐超市 🛒 | 水果蔬菜认知 |
+| 温馨小家 🏠 | 日常对话 |
+| 快乐公园 🌳 | 天气和自然 |
+
+---
+
+## ⚠️ 常见问题
+
+### Q1: 端口被占用
 
 ```bash
 # 查看占用端口的进程
@@ -259,164 +167,121 @@ lsof -i :3000
 # 杀死进程
 kill -9 <PID>
 
-# 或者换端口
-PORT=3001 npm start
+# 或修改端口
+echo "PORT=3001" >> .env
 ```
 
----
-
-## 📝 项目结构
-
-```
-english-roleplay/
-├── index.html          # 前端主页面
-├── css/
-│   └── style.css       # 样式
-├── js/
-│   ├── app.js          # 主逻辑
-│   ├── rtc-client.js   # RTC 客户端
-│   └── websocket-client.js  # WebSocket
-├── server/
-│   ├── index.js        # ⭐ 服务端（全栈）
-│   ├── .env            # 配置文件
-│   ├── configure.sh    # 配置脚本
-│   └── test-api.js     # 测试工具
-└── docs/               # 文档
-```
-
----
-
-## 🎬 对比之前
-
-### 之前的启动方式
+### Q2: 凭证错误
 
 ```bash
-# 终端 1 - 前端
-cd english-roleplay
-python3 -m http.server 8080
+# 检查 .env 配置
+cat .env | grep VOLC
 
-# 终端 2 - 后端
-cd server
-node index.js 3000
-
-# 浏览器访问
-http://localhost:8080
+# 确保没有占位符 "your_"
+# 确保密钥格式正确
 ```
 
-**问题：**
-- ❌ 要开两个终端
-- ❌ 两个端口容易混淆
-- ❌ 部署复杂
+### Q3: 前端无法访问
+
+```bash
+# 检查防火墙
+sudo ufw status
+
+# 允许 3000 端口
+sudo ufw allow 3000
+
+# 检查服务是否运行
+curl http://localhost:3000/health
+```
+
+### Q4: RTC SDK 加载失败
+
+- 检查网络连接
+- 清除浏览器缓存
+- 使用 Chrome/Edge 浏览器
 
 ---
 
-### 现在的启动方式
+## 📚 详细文档
+
+| 文档 | 用途 |
+|------|------|
+| [`README-FINAL.md`](README-FINAL.md) | 项目总结 |
+| [`CORRECT-FLOW.md`](CORRECT-FLOW.md) | ⭐ 正确流程 |
+| [`API-CONFIG.md`](API-CONFIG.md) | 配置 API 说明 |
+| [`INTEGRATION-FLOW.md`](INTEGRATION-FLOW.md) | 集成流程 |
+| [`QUICK-REFERENCE.md`](QUICK-REFERENCE.md) | 快速参考 |
+| [`DEPLOY-TEST.md`](DEPLOY-TEST.md) | 部署测试 |
+| [`STARTVOICECHAT-SETUP.md`](STARTVOICECHAT-SETUP.md) | 配置指南 |
+
+---
+
+## 🔧 开发命令
 
 ```bash
-# 一个终端
-cd server
+# 安装依赖
+npm install
+
+# 启动服务
 npm start
 
-# 浏览器访问
-http://localhost:3000
-```
-
-**优势：**
-- ✅ 一个终端
-- ✅ 一个端口
-- ✅ 部署简单
-- ✅ 开发体验好
-
----
-
-## 💡 下一步
-
-### 本地开发
-
-```bash
-# 启动服务
+# 开发模式（自动重启）
 npm run dev
 
-# 修改代码
-# 自动重启
+# 运行测试
+npm test
 
-# 刷新浏览器
-# 立即生效
-```
-
----
-
-### 部署到服务器
-
-```bash
-# 1. 上传代码
-scp -r english-roleplay user@server:/var/www/
-
-# 2. 安装依赖
-cd /var/www/english-roleplay/server
-npm install --production
-
-# 3. 配置环境变量
-cp .env.example .env
-# 编辑 .env 填入 API 密钥
-
-# 4. 启动服务
-npm start
-
-# 5. 配置 Nginx（可选）
-# 反向代理到 3000 端口
-```
-
----
-
-### 使用 PM2 管理（生产环境）
-
-```bash
-# 安装 PM2
-npm install -g pm2
-
-# 启动服务
-pm2 start server/index.js --name english-friend
-
-# 查看状态
-pm2 status
-
-# 查看日志
-pm2 logs english-friend
-
-# 重启
-pm2 restart english-friend
-
-# 开机自启
-pm2 startup
-pm2 save
-```
-
----
-
-## 📞 需要帮助？
-
-**查看文档：**
-- `README.md` - 项目总览
-- `QUICK-SETUP.md` - API 配置
-- `VOLCENGINE-SETUP.md` - 详细教程
-
-**测试工具：**
-```bash
-npm test  # 测试 API
-```
-
-**健康检查：**
-```bash
+# 查看健康状态
 curl http://localhost:3000/health
 ```
 
 ---
 
-**就这么简单！开始使用吧！** 🐾
+## 📊 项目结构
 
-**快速命令：**
-```bash
-cd english-roleplay/server
-npm start
 ```
+english-roleplay/
+├── index.html              # 主页面
+├── js/
+│   ├── app.js              # 应用主逻辑
+│   ├── startvoicechat-client.js  # StartVoiceChat 客户端
+│   ├── characters.js       # 角色配置
+│   └── scenes.js           # 场景配置
+├── css/
+│   └── style.css           # 样式
+├── server/
+│   ├── index-join-ai.js    # ⭐ 服务端入口
+│   ├── volc-start-voicechat.js   # API 客户端
+│   ├── token-generator-official.js  # Token 生成
+│   ├── test-integration.js  # 测试脚本
+│   └── .env.example        # 配置模板
+└── docs/                   # 文档
+    ├── START.md            # 本文档
+    ├── README-FINAL.md     # 项目总结
+    └── CORRECT-FLOW.md     # 正确流程
+```
+
+---
+
+## ✅ 启动检查清单
+
+- [ ] Node.js 16+ 已安装
+- [ ] 依赖已安装 (`npm install`)
+- [ ] `.env` 文件已配置
+- [ ] API 凭证已填写（无占位符）
+- [ ] 服务启动成功
+- [ ] 健康检查通过
+- [ ] 浏览器可访问
+- [ ] 测试通过
+
+---
+
+## 🎉 开始使用
+
+```bash
+cd ~/projects/english-roleplay/server
+npm start
+# 访问：http://localhost:3000
+```
+
+**祝你使用愉快！** 🐾✨

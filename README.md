@@ -1,8 +1,10 @@
-# 🎨 English Friend - 英语好朋友（画布版）
+# 🎨 English Friend - 英语好朋友
 
-**v2.0.0** - 阿里云百炼版
+**v3.1.0** - 火山引擎 StartVoiceChat 版
 
 为 5 岁小朋友设计的**沉浸式**英语启蒙应用！
+
+---
 
 ## 🌟 核心理念
 
@@ -11,186 +13,216 @@
 - 🖼️ **画布为主体** - 对话发生在场景中
 - 🎭 **角色在画布上** - 有表情、有动作
 - 📸 **动态显示内容** - 说到什么显示什么
-- 🎬 **支持图片/视频** - 视觉化学习
-- 💬 **对话气泡** - 简洁不抢镜
+- 🗣️ **实时语音对话** - 火山引擎 StartVoiceChat 一站式方案
 
-## 🎪 场景与内容
+---
 
-### 1. 魔法动物园 🦁
-- 🦁 狮子 - 学习动物名称和叫声
-- 🐘 大象 - 认识特征（长鼻子）
-- 🦒 长颈鹿 - 高高的动物
-- 🐵 猴子 - 模仿叫声
-- 🦓 斑马 - 黑白条纹
+## 🚀 快速开始
 
-### 2. 欢乐超市 🛒
-- 🍎 苹果 - 水果认知
-- 🍌 香蕉 - 颜色和形状
-- 🥕 胡萝卜 - 蔬菜认知
-- 🥛 牛奶 - 饮品选择
-
-### 3. 温馨小家 🏠
-- ☀️ 早晨问候
-- 🍳 早餐对话
-- 🧹 收拾房间
-- 🧸 玩具分享
-
-### 4. 快乐公园 🌳
-- ☀️ 天气认知
-- 🌸 花朵颜色
-- 🐸 青蛙跳跃
-- 🦋 蝴蝶观察
-
-## ✨ 功能特色
-
-### 画布功能
-- 🎨 **动态背景** - 每个场景有不同渐变背景
-- 🖼️ **内容显示** - 对话时自动显示相关图片/emoji
-- 📍 **任意位置** - 内容可出现在画布任意位置
-- 🔍 **点击放大** - 点击内容可放大查看
-- ❌ **可关闭** - 不需要的内容可以关闭
-
-### 角色功能
-- 🎭 **5 个角色** - Miss Emma、Tommy、Lily、Coach Mike、Grandma Rose
-- 💃 **浮动动画** - 角色有呼吸感浮动效果
-- 🗣️ **说话动画** - 说话时角色会动
-- 🔊 **语音朗读** - 标准英语发音
-
-### 对话功能
-- 💬 **对话气泡** - 英文 + 中文双语显示
-- 🎤 **语音输入** - 按住说话回应
-- ⚡ **快速回复** - 点击选项快速回应
-- 🧠 **智能理解** - 理解孩子的话并回应
-- 💾 **记忆系统** - 记住孩子的信息
-
-## 🚀 使用方法
-
-### 本地运行（全栈版）⭐
-
-**快速开始（5 分钟）：** 详见 [`QUICKSTART-BAILIAN.md`](QUICKSTART-BAILIAN.md)
+**5 分钟启动：** 详见 [`START.md`](START.md)
 
 ```bash
-cd english-roleplay/server
+cd server
 npm install
-
-# 配置 API Key（阿里云百炼）
 cp .env.example .env
-# 编辑 .env，设置 DASHSCOPE_API_KEY
+# 编辑 .env 填入 API 凭证
+npm start
+# 访问：http://localhost:3000
+```
 
-# 测试 API 连接
-npm test
+---
+
+## 🎪 场景与角色
+
+### 4 个场景
+
+| 场景 | 说明 |
+|------|------|
+| 🦁 魔法动物园 | 学习动物名称和叫声 |
+| 🛒 欢乐超市 | 水果蔬菜认知 |
+| 🏠 温馨小家 | 日常对话 |
+| 🌳 快乐公园 | 天气和自然 |
+
+### 5 个角色
+
+| 角色 | 说明 |
+|------|------|
+| 👩‍🏫 Emma | 温柔的英语老师 |
+| 👦 Tommy | 5 岁美国小男孩 |
+| 👧 Lily | 7 岁活泼小姐姐 |
+| 🏃 Mike | 阳光运动教练 |
+| 👵 Rose | 慈祥老奶奶 |
+
+---
+
+## ✨ 核心功能
+
+### 画布式 UI
+- 🎨 动态背景
+- 🖼️ 内容显示
+- 📍 任意位置
+- 🔍 点击放大
+
+### 实时对话
+- 🗣️ 语音输入
+- 🎧 AI 实时回复
+- 💬 对话气泡
+- 🧠 智能理解
+
+### 技术特点
+- ⚡ 低延迟（~1.5 秒）
+- ☁️ 云端一站式处理
+- 📱 响应式设计
+- 🔒 安全的 API 配置
+
+---
+
+## 🏗️ 技术架构
+
+```
+孩子浏览器 ←→ RTC ←→ 火山云端 (ASR + LLM + TTS 一站式)
+```
+
+**正确流程（5 步）：**
+1. 前端创建 RTC 房间并加入
+2. 开启本地音视频采集
+3. 订阅和播放房间内音视频流
+4. 调用后端接口将 AI 角色加入
+5. 结束时调用后端结束 AI，离开并销毁房间
+
+详见：[`CORRECT-FLOW.md`](CORRECT-FLOW.md)
+
+---
+
+## 📁 项目结构
+
+```
+english-roleplay/
+├── START.md                  # ⭐ 快速启动指南
+├── README.md                 # 本文档
+├── index.html                # 主页面
+├── js/
+│   ├── app.js                # 应用主逻辑
+│   ├── startvoicechat-client.js  # StartVoiceChat 客户端
+│   ├── characters.js         # 角色配置
+│   └── scenes.js             # 场景配置
+├── css/
+│   └── style.css             # 样式
+├── server/
+│   ├── index-join-ai.js      # ⭐ 服务端入口
+│   ├── volc-start-voicechat.js     # API 客户端
+│   ├── token-generator-official.js # Token 生成
+│   ├── test-integration.js   # 测试脚本
+│   └── .env.example          # 配置模板
+└── docs/
+    ├── README-FINAL.md       # 项目总结
+    ├── CORRECT-FLOW.md       # 正确流程 ⭐
+    ├── API-CONFIG.md         # 配置 API
+    ├── INTEGRATION-FLOW.md   # 集成流程
+    ├── QUICK-REFERENCE.md    # 快速参考
+    ├── DEPLOY-TEST.md        # 部署测试
+    └── STARTVOICECHAT-SETUP.md # 配置指南
+```
+
+---
+
+## 📚 文档索引
+
+### 新手必读
+- [`START.md`](START.md) - ⭐ 5 分钟快速启动
+- [`README-FINAL.md`](README-FINAL.md) - 项目总结
+- [`CORRECT-FLOW.md`](CORRECT-FLOW.md) - 正确流程
+
+### 开发文档
+- [`API-CONFIG.md`](API-CONFIG.md) - 前端配置 API
+- [`INTEGRATION-FLOW.md`](INTEGRATION-FLOW.md) - 集成流程
+- [`QUICK-REFERENCE.md`](QUICK-REFERENCE.md) - 快速参考
+
+### 部署运维
+- [`DEPLOY-TEST.md`](DEPLOY-TEST.md) - 部署与测试
+- [`STARTVOICECHAT-SETUP.md`](STARTVOICECHAT-SETUP.md) - 配置指南
+
+---
+
+## 💰 费用说明
+
+| 项目 | 免费额度 | 按量计费 |
+|------|----------|----------|
+| RTC | 10,000 分钟/月 | ¥0.02/分钟 |
+| S2S 模型 | 新用户赠送 | ¥0.008/千 tokens |
+
+**估算：** 每天 100 个孩子，每人 10 分钟 → 月费用约 ¥600-800
+
+---
+
+## 🛠️ 开发命令
+
+```bash
+# 安装依赖
+npm install
 
 # 启动服务
 npm start
-```
 
-访问：http://localhost:3000
-
-> 💡 **现在只需一个命令！** 不需要 Python 了～
-
----
-
-### 开发模式（自动重启）
-
-```bash
-cd server
+# 开发模式（自动重启）
 npm run dev
+
+# 运行测试
+npm test
+
+# 健康检查
+curl http://localhost:3000/health
 ```
 
 ---
 
-### 局域网访问
+## 📊 性能指标
 
-```bash
-# 查看本机 IP
-ip addr show | grep "inet "
-
-# 用手机/平板访问
-http://[你的 IP]:3000
-```
+| 指标 | 数值 |
+|------|------|
+| 端到端延迟 | ~1.5 秒 |
+| ASR 识别精度 | > 95% |
+| TTS 音质 | 高质量 |
+| 并发支持 | > 100 房间 |
 
 ---
 
-### 部署上线
+## 🔗 相关链接
 
-**方式 1：Node.js 服务器（推荐）**
+- **火山引擎 RTC:** https://www.volcengine.com/docs/6348/75707
+- **StartVoiceChat API:** https://www.volcengine.com/docs/6348/1558163
+- **火山引擎控制台:** https://console.volcengine.com/
+
+---
+
+## 📝 更新日志
+
+### v3.1.0 (2026-03-16) - 正确流程版
+- ✅ 前端完全控制房间
+- ✅ 配置和 Token 从后端 API 获取
+- ✅ 使用官方 AccessToken.js 生成 Token
+- ✅ 清理过时代码和文档
+
+### v3.0.0 (2026-03-15) - StartVoiceChat 版
+- ✅ 火山引擎 StartVoiceChat 集成
+- ✅ 云端一站式处理（ASR+LLM+TTS）
+- ✅ 延迟降低至 ~1.5 秒
+
+### v2.0.0 (2026-03-14) - 百炼版
+- ✅ 迁移到阿里云百炼 Qwen 大模型
+- ✅ 成本降低 50%
+
+### v1.0.0 (2026-03-12) - 初始版本
+- ✅ 基础画布 UI 和角色系统
+
+---
+
+## 🎉 开始使用
+
 ```bash
-# 上传到服务器
-cd server
-npm install --production
+cd ~/projects/english-roleplay/server
 npm start
+# 访问：http://localhost:3000
 ```
 
-**方式 2：PM2 管理（生产环境）**
-```bash
-npm install -g pm2
-pm2 start index.js --name english-friend
-pm2 startup
-pm2 save
-```
-
-**方式 3：Docker**
-```bash
-# 创建 Dockerfile
-docker build -t english-friend .
-docker run -p 3000:3000 english-friend
-```
-
-## 📱 使用流程
-
-1. **选角色** - 5 个角色任选
-2. **选场景** - 动物园/超市/家/公园
-3. **看画布** - 角色出现在场景中
-4. **听对话** - 角色主动发起对话
-5. **看内容** - 说到什么显示什么
-6. **来回应** - 语音或点击回复
-7. **继续聊** - 自然流畅的对话
-
-## 🎨 画布示例
-
-**动物园场景：**
-```
-┌─────────────────────────────┐
-│         ☀️                  │
-│    🦒                       │
-│         🦁  👩‍🏫            │
-│    🐘     💬                │
-│         🦓                  │
-└─────────────────────────────┘
-     🎤 [按住说话]
-```
-
-角色在中间，动物分布在画布各处，点击可以放大查看！
-
-## 💡 教育价值
-
-- 🎯 **视觉化学习** - 看到什么学什么
-- 🗣️ **情境对话** - 在场景中学习
-- 🎮 **互动性强** - 点击、拖拽、语音
-- 😊 **趣味性强** - 像玩游戏一样学习
-- 🔄 **重复学习** - 可以反复玩同一个场景
-
-## 🛠️ 技术特点
-
-- 全栈模式：Node.js 服务端 + 前端 SPA
-- 阿里云百炼 Qwen 大模型对话
-- 阿里云百炼实时 ASR 语音识别
-- WebSocket 实时双向通信
-- Canvas 式布局，非传统聊天
-- 动态内容渲染
-- 响应式设计
-
-## 📝 扩展开发
-
-### 添加新场景
-编辑 `js/scenes.js`，添加新的场景和对话
-
-### 添加新媒体类型
-在 `showMediaContent()` 函数中支持新的媒体类型
-
-### 自定义角色
-编辑 `js/characters.js`
-
----
-
-**让英语启蒙像看动画片一样有趣！** 🐾
+**让英语启蒙像看动画片一样有趣！** 🐾✨
