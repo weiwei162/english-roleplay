@@ -443,61 +443,6 @@ h1 {
     z-index: 10;
 }
 
-/* Speech Bubble */
-.speech-bubble {
-    position: absolute;
-    top: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: white;
-    border-radius: 25px;
-    padding: 20px 25px;
-    max-width: 80%;
-    box-shadow: 0 5px 30px rgba(0,0,0,0.2);
-    z-index: 20;
-    animation: bubbleFloat 2s ease-in-out infinite;
-}
-
-@keyframes bubbleFloat {
-    0%, 100% { transform: translateX(-50%) translateY(0); }
-    50% { transform: translateX(-50%) translateY(-5px); }
-}
-
-.bubble-text {
-    font-size: 1.3em;
-    color: #333;
-    line-height: 1.4;
-    margin-bottom: 5px;
-}
-
-.bubble-cn {
-    font-size: 0.9em;
-    color: #888;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid #eee;
-}
-
-.speak-btn {
-    position: absolute;
-    top: -15px;
-    right: -15px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    font-size: 1.2em;
-    cursor: pointer;
-    box-shadow: 0 3px 15px rgba(102,126,234,0.4);
-    transition: transform 0.2s;
-}
-
-.speak-btn:hover {
-    transform: scale(1.1);
-}
-
 /* Interaction Bar */
 .interaction-bar {
     background: white;
@@ -877,15 +822,6 @@ h1 {
     
     .character-body {
         font-size: 6em;
-    }
-    
-    .bubble-text {
-        font-size: 1.1em;
-    }
-    
-    .speech-bubble {
-        max-width: 90%;
-        padding: 15px;
     }
     
     .video-container {

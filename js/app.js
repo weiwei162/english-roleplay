@@ -136,11 +136,7 @@ function speak(text, callback) {
     }
 }
 
-// 朗读当前对话
-function speakCurrent() {
-    const dialogue = currentScene.dialogues[currentDialogueIndex];
-    speak(dialogue.text);
-}
+
 
 // 切换屏幕
 /**
@@ -226,18 +222,16 @@ function handleCharacterClick() {
     sprite.classList.add('clapping');
     setTimeout(() => sprite.classList.remove('clapping'), 1000);
     
-    // 随机回应
+    // 随机回应（语音播放，不显示气泡）
     const responses = [
-        { text: "Hehe! You're so funny!", textCn: "嘿嘿！你真有趣！" },
-        { text: "I like playing with you!", textCn: "我喜欢和你一起玩！" },
-        { text: "Want to hear a joke?", textCn: "想听个笑话吗？" },
-        { text: "You make me happy!", textCn: "你让我很开心！" }
+        "Hehe! You're so funny!",
+        "I like playing with you!",
+        "Want to hear a joke?",
+        "You make me happy!"
     ];
     
     const response = responses[Math.floor(Math.random() * responses.length)];
-    document.getElementById('bubble-text').textContent = response.text;
-    document.getElementById('bubble-cn').textContent = response.textCn;
-    speak(response.text);
+    speak(response);
 }
 
 // ==================== ⭐ StartVoiceChat AI 语音对话集成（正确流程） ====================
@@ -564,10 +558,6 @@ function startDialogue() {
     
     const dialogue = currentScene.dialogues[currentDialogueIndex];
     
-    // 更新对话气泡
-    document.getElementById('bubble-text').textContent = dialogue.text;
-    document.getElementById('bubble-cn').textContent = dialogue.textCn || '';
-    
     // 显示媒体内容并移动角色
     if (dialogue.media) {
         const contentId = showMediaContent(dialogue.media);
@@ -733,8 +723,6 @@ function handleChildInput(text) {
     
     // 显示回应
     setTimeout(() => {
-        document.getElementById('bubble-text').textContent = response.text;
-        document.getElementById('bubble-cn').textContent = '';
         speak(response.text, () => {
             // 回应后继续下一个对话
             setTimeout(() => {
@@ -748,10 +736,6 @@ function handleChildInput(text) {
 // 显示场景完成
 function showSceneComplete() {
     clearCanvasContent();
-    
-    document.getElementById('bubble-text').textContent = 
-        `🎉 Great job! You completed ${currentScene.name}!`;
-    document.getElementById('bubble-cn').textContent = '太棒了！你完成了这个场景！';
     
     const actions = [
         "Play Again 🔄",
