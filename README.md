@@ -1,6 +1,6 @@
 # 🎨 English Friend - 英语好朋友
 
-**v3.1.0** - 火山引擎 StartVoiceChat 版
+**v3.2.0** - 支持真实 LLM (OpenAI/Claude/Gemini/Ollama)
 
 为 5 岁小朋友设计的**沉浸式**英语启蒙应用！
 
@@ -19,16 +19,31 @@
 
 ## 🚀 快速开始
 
-**5 分钟启动：** 详见 [`START.md`](START.md)
+### 方式 1: 使用真实 LLM（推荐）⭐
 
 ```bash
 cd server
 npm install
 cp .env.example .env
-# 编辑 .env 填入 API 凭证
+# 编辑 .env，设置 AI_MODE=custom 和 LLM_API_KEY
+./start.sh
+# 访问：http://localhost:3000
+```
+
+详见：[`QUICKSTART-PI-AGENT.md`](QUICKSTART-PI-AGENT.md)
+
+### 方式 2: 火山引擎端到端
+
+```bash
+cd server
+npm install
+cp .env.example .env
+# 编辑 .env 填入火山引擎 API 凭证
 npm start
 # 访问：http://localhost:3000 (或 https://localhost:3443)
 ```
+
+详见：[`START.md`](START.md)
 
 ### 🔐 启用 HTTPS（可选）
 
@@ -46,6 +61,23 @@ npm start
 详见：[`HTTPS-CONFIG.md`](HTTPS-CONFIG.md)
 
 ---
+
+## ✨ 核心特性
+
+### 🎭 角色动态移动
+- AI 说话时角色自动在场景中移动
+- 5 个位置点循环（左/中/右/左中/右中）
+- 带跳跃动画效果
+
+### 🤖 真实 LLM 对话
+- 支持 OpenAI GPT-4o、Claude、Gemini、Ollama
+- 内置教学工具（字典、发音评分、场景提示）
+- SSE 流式输出，低延迟
+
+### 🎨 沉浸式场景
+- 4 个主题场景（动物园、超市、家、公园）
+- 动态显示教学内容（动物、食物、日常用品）
+- 中英文双语支持
 
 ## 🎪 场景与角色
 
@@ -143,12 +175,15 @@ english-roleplay/
 
 ## 📚 文档索引
 
-### 新手必读
-- [`START.md`](START.md) - ⭐ 5 分钟快速启动
-- [`README-FINAL.md`](README-FINAL.md) - 项目总结
-- [`CORRECT-FLOW.md`](CORRECT-FLOW.md) - 正确流程
+### 新手必读 ⭐
+- [`QUICKSTART-PI-AGENT.md`](QUICKSTART-PI-AGENT.md) - **使用真实 LLM (推荐)**
+- [`START.md`](START.md) - 5 分钟快速启动（火山引擎）
+- [`FINAL-SUMMARY.md`](FINAL-SUMMARY.md) - **完整开发总结**
 
 ### 开发文档
+- [`PI-AGENT-REAL-GUIDE.md`](PI-AGENT-REAL-GUIDE.md) - 真实 Agent 详细指南
+- [`PI-AGENT-INTEGRATION.md`](PI-AGENT-INTEGRATION.md) - CustomLLM 集成
+- [`CHARACTER-MOVE-FEATURE.md`](CHARACTER-MOVE-FEATURE.md) - 角色移动功能
 - [`API-CONFIG.md`](API-CONFIG.md) - 前端配置 API
 - [`INTEGRATION-FLOW.md`](INTEGRATION-FLOW.md) - 集成流程
 - [`QUICK-REFERENCE.md`](QUICK-REFERENCE.md) - 快速参考
@@ -156,6 +191,7 @@ english-roleplay/
 ### 部署运维
 - [`DEPLOY-TEST.md`](DEPLOY-TEST.md) - 部署与测试
 - [`STARTVOICECHAT-SETUP.md`](STARTVOICECHAT-SETUP.md) - 配置指南
+- [`HTTPS-CONFIG.md`](HTTPS-CONFIG.md) - HTTPS 配置
 
 ---
 
