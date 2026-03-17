@@ -234,6 +234,64 @@ function handleCharacterClick() {
     speak(response);
 }
 
+/**
+ * 处理 AI 字幕事件 - 根据 AI 说话内容移动角色
+ * @param {Object} subtitle - 字幕数据
+ */
+let lastSubtitleText = ''; // 避免重复处理
+
+function handleAISubtitle(subtitle) {
+    if (!subtitle || !subtitle.data || !Array.isArray(subtitle.data)) return;
+    
+    // 遍历字幕数据（可能有多条）
+    for (const item of subtitle.data) {
+        const { text, userId, paragraph, definite } = item;
+        
+        // 只处理 AI 的字幕（userId 以 ai_ 开头）
+        if (!userId || !userId.startsWith('ai_')) continue;
+        
+        // 避免重复处理相同的字幕
+        if (text === lastSubtitleText) continue;
+        
+        console.log('🤖 AI subtitle:', text, '| paragraph:', paragraph, '| definite:', definite);
+        
+        // 当 AI 开始说完整的一句话时（paragraph: true），移动角色到对应位置
+        if (paragraph && definite) {
+            lastSubtitleText = text;
+            
+            // 查找匹配的对话（根据文本内容模糊匹配）
+            const dialogueIndex = currentScene.dialogues.findIndex(d => {
+                if (!d.text) return false;
+                // 检查是否包含关键词（前 15 个字符或主要单词）
+                const shortText = d.text.substring(0, 15).split(' ').slice(0, 3).join(' ');
+                return text.includes(shortText) || d.text.includes(text.substring(0, 15));
+            });
+            
+            if (dialogueIndex >= 0) {
+                const dialogue = currentScene.dialogues[dialogueIndex];
+                currentDialogueIndex = dialogueIndex;
+                
+                console.log('✅ Matched dialogue:', dialogue.text);
+                
+                // 如果对话配置了角色位置，移动角色
+                if (dialogue.characterPosition) {
+                    console.log('🚶 Moving character to:', dialogue.characterPosition);
+                    moveCharacterTo(
+                        dialogue.characterPosition.x,
+                        dialogue.characterPosition.y,
+                        { jump: true }
+                    );
+                }
+                
+                // 显示对应的媒体内容
+                if (dialogue.media) {
+                    showMediaContent(dialogue.media);
+                }
+            }
+        }
+    }
+}
+
 // ==================== ⭐ StartVoiceChat AI 语音对话集成（正确流程） ====================
 
 /**
@@ -329,6 +387,12 @@ async function createAIVoiceChatRoom() {
                 // 远端流回调
                 onRemoteStream: (stream) => {
                     console.log('📥 [4/4] Remote stream received:', stream);
+                },
+                
+                // 字幕回调 - AI 说话时触发
+                onSubtitle: (subtitle) => {
+                    console.log('💬 Subtitle received:', subtitle);
+                    handleAISubtitle(subtitle);
                 }
             }
         );

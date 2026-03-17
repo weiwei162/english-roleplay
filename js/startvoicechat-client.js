@@ -29,6 +29,7 @@ class StartVoiceChatClient {
         this.onStatusChange = options.onStatusChange || (() => {});
         this.onAIJoined = options.onAIJoined || (() => {});
         this.onRemoteStream = options.onRemoteStream || (() => {});
+        this.onSubtitle = options.onSubtitle || (() => {}); // 字幕回调
     }
 
     /**
@@ -391,6 +392,68 @@ class StartVoiceChatClient {
             // 可以在这里处理接收到的音频数据
             // console.log('🎵 Audio data from', e.userId, ':', e.data.byteLength, 'bytes');
         });
+        
+        // 字幕消息回调（二进制数据，magic number: "subv"）
+        this.engine.on(events.onRoomBinaryMessageReceived || 'onRoomBinaryMessageReceived', (e) => {
+            console.log('💬 Received binary message from:', e.userId, 'size:', e.message?.byteLength || e.data?.length);
+            
+            try {
+                // 解析字幕数据
+                const subtitle = this.parseSubtitle(e.message || e.data);
+                if (subtitle) {
+                    console.log('📝 Subtitle:', subtitle);
+                    
+                    // 触发字幕回调
+                    this.onSubtitle?.(subtitle);
+                }
+            } catch (error) {
+                console.error('❌ Failed to parse subtitle:', error);
+            }
+        });
+    }
+
+    /**
+     * 解析火山引擎字幕数据
+     * 格式：magic number "subv" (4 bytes) + length (4 bytes, big-endian) + JSON string
+     */
+    parseSubtitle(data) {
+        if (!data) return null;
+        
+        // 处理 ArrayBuffer 或 Uint8Array
+        const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+        
+        if (bytes.length < 8) {
+            console.warn('⚠️ Subtitle data too short');
+            return null;
+        }
+        
+        // 检查 magic number "subv" (0x73, 0x75, 0x62, 0x76)
+        const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+        if (magic !== 'subv') {
+            console.warn('⚠️ Invalid magic number:', magic);
+            return null;
+        }
+        
+        // 读取长度（大端序）
+        const length = (bytes[4] << 24) | (bytes[5] << 16) | (bytes[6] << 8) | bytes[7];
+        
+        if (bytes.length - 8 !== length) {
+            console.warn('⚠️ Length mismatch:', bytes.length - 8, 'vs', length);
+            return null;
+        }
+        
+        // 提取 JSON 字符串
+        const jsonBytes = bytes.slice(8);
+        const jsonString = new TextDecoder('utf-8').decode(jsonBytes);
+        
+        try {
+            const parsed = JSON.parse(jsonString);
+            console.log('✅ Subtitle parsed:', parsed);
+            return parsed;
+        } catch (error) {
+            console.error('❌ Failed to parse JSON:', error, jsonString);
+            return null;
+        }
     }
 
     /**

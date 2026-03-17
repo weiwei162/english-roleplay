@@ -10,6 +10,7 @@ const scenes = {
             {
                 text: "Welcome to the zoo! Look, what's this?",
                 textCn: "欢迎来到动物园！看，这是什么？",
+                characterPosition: { x: 30, y: 60 }, // 角色站在左边
                 media: {
                     type: 'emoji',
                     content: '🦁',
@@ -25,6 +26,7 @@ const scenes = {
             {
                 text: "Do you want to see more animals?",
                 textCn: "想看更多动物吗？",
+                characterPosition: { x: 70, y: 60 }, // 角色走到右边
                 media: {
                     type: 'emoji',
                     content: '🐘',
@@ -40,6 +42,7 @@ const scenes = {
             {
                 text: "Look at the tall animal!",
                 textCn: "看那个高高的动物！",
+                characterPosition: { x: 25, y: 60 }, // 角色站在左边
                 media: {
                     type: 'emoji',
                     content: '🦒',
@@ -55,6 +58,7 @@ const scenes = {
             {
                 text: "Who says OOH OOH AH AH?",
                 textCn: "谁在说 OOH OOH AH AH？",
+                characterPosition: { x: 50, y: 60 }, // 角色站在中间
                 media: {
                     type: 'emoji',
                     content: '🐵',
@@ -70,6 +74,7 @@ const scenes = {
             {
                 text: "What about this black and white animal?",
                 textCn: "这个黑白相间的动物呢？",
+                characterPosition: { x: 65, y: 60 }, // 角色站在右边
                 media: {
                     type: 'emoji',
                     content: '🦓',

@@ -323,6 +323,12 @@ function getComponentConfig(options = {}) {
                     enable_language_detector: false
                 }
             }
+        },
+        
+        // 字幕配置 - 开启客户端字幕回调
+        SubtitleConfig: {
+            DisableRTSSubtitle: false, // 开启字幕
+            SubtitleMode: 1 // 1=LLM 原始回复（更快），0=TTS 对齐（更精准但慢）
         }
     };
 }
@@ -361,6 +367,12 @@ function getS2SConfig(options = {}) {
                     sample_rate: 24000
                 }
             }
+        },
+        
+        // 字幕配置 - 开启客户端字幕回调
+        SubtitleConfig: {
+            DisableRTSSubtitle: false, // 开启字幕
+            SubtitleMode: 1 // 1=LLM 原始回复（更快），0=TTS 对齐（更精准但慢）
         }
     };
 }
