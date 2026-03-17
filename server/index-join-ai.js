@@ -19,6 +19,10 @@ const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLM
 const { combineCharacterAndScenePrompt, getScenePrompt } = require('./prompts');
 const { generateToken, generateWildcardToken, verifyToken } = require('./token-generator');
 const { register, login, authMiddleware, optionalAuth } = require('./auth');
+
+// pi-ai 集成（真实 LLM）
+const { getModel, stream, complete, Type } = require('@mariozechner/pi-ai');
+
 require('dotenv').config();
 
 const app = express();
@@ -29,6 +33,112 @@ app.use(express.json());
 
 const AI_MODE = process.env.AI_MODE || 's2s'; // 'component', 's2s', 或 'custom' (pi-agent-core)
 const PORT = parseInt(process.env.PORT) || 3000;
+
+// ==================== pi-agent-real 集成（真实 LLM） ====================
+
+const LLM_PROVIDER = process.env.LLM_PROVIDER || 'openai';
+const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+const LLM_API_KEY = process.env.LLM_API_KEY;
+const LLM_BASE_URL = process.env.LLM_BASE_URL;
+
+// 系统提示词 - 英语老师角色
+const TEACHER_SYSTEM_PROMPT = `You are a friendly and encouraging English teacher for kids aged 6-10.
+
+Your role is to:
+- Speak in simple, clear English with short sentences
+- Use common vocabulary suitable for children
+- Be patient, supportive, and enthusiastic
+- Ask follow-up questions to encourage conversation
+- Praise the child's efforts frequently
+- Make learning fun and engaging
+
+Important rules:
+- Always respond in English only
+- Keep responses under 30 words for better TTS
+- Use emojis to make it fun 🦁🌟🎉
+- Ask one question at a time
+- Be encouraging: "Great job!", "Excellent!", "Well done!"`;
+
+// 工具定义
+const dictionaryTool = {
+    name: 'dictionary',
+    description: 'Look up the meaning of an English word for kids',
+    parameters: Type.Object({
+        word: Type.String({ description: 'The English word to look up' })
+    }),
+    execute: async ({ word }) => {
+        const definitions = {
+            'lion': 'A big yellow cat that roars. King of animals! 🦁',
+            'elephant': 'A very big gray animal with a long nose (trunk). 🐘',
+            'giraffe': 'A very tall animal with a long neck. 🦒',
+            'monkey': 'A playful animal that loves bananas. 🐵',
+            'zebra': 'A horse with black and white stripes. 🦓',
+            'apple': 'A red or green fruit. Crunchy and sweet! 🍎',
+            'banana': 'A yellow curved fruit. Monkeys love it! 🍌',
+            'carrot': 'An orange vegetable. Rabbits love carrots! 🥕',
+            'milk': 'A white drink. Makes you strong! 🥛',
+            'sun': 'The bright yellow thing in the sky. Gives us light! ☀️',
+            'flower': 'A beautiful colorful plant. Smells nice! 🌸',
+            'frog': 'A green animal that jumps and says "ribbit"! 🐸',
+            'butterfly': 'A colorful flying insect. Very pretty! 🦋'
+        };
+        const definition = definitions[word.toLowerCase()] || `Sorry, I don't know the word "${word}" yet. Let me explain it simply!`;
+        return { word, definition, example: `Example: "The ${word} is fun!"` };
+    }
+};
+
+const pronunciationTool = {
+    name: 'pronunciation_score',
+    description: 'Score the pronunciation of an English word or sentence',
+    parameters: Type.Object({
+        text: Type.String({ description: 'The text to score' })
+    }),
+    execute: async ({ text }) => {
+        const score = Math.floor(Math.random() * 20) + 80;
+        let feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : score >= 85 ? "Great job! 👍" : "Good try! 😊";
+        return { score, feedback, tips: `Great job saying "${text}"!` };
+    }
+};
+
+const sceneHintTool = {
+    name: 'scene_hint',
+    description: 'Get conversation hints for the current learning scene',
+    parameters: Type.Object({
+        scene: Type.String({ enum: ['zoo', 'market', 'home', 'park'], description: 'The current scene' })
+    }),
+    execute: async ({ scene }) => {
+        const hints = {
+            zoo: { topic: 'Animals', questions: ["What's your favorite animal?"], vocabulary: ['lion', 'elephant', 'giraffe'] },
+            market: { topic: 'Food', questions: ["What fruit do you like?"], vocabulary: ['apple', 'banana', 'carrot'] },
+            home: { topic: 'Daily Routine', questions: ["What time do you wake up?"], vocabulary: ['morning', 'breakfast'] },
+            park: { topic: 'Nature', questions: ["Do you like sunny days?"], vocabulary: ['sun', 'flower', 'frog'] }
+        };
+        return hints[scene] || { topic: 'Conversation', questions: ['Tell me more!'], vocabulary: [] };
+    }
+};
+
+const TOOLS = [dictionaryTool, pronunciationTool, sceneHintTool];
+
+// 会话管理（pi-agent）
+const piSessions = new Map();
+
+function getOrCreatePiSession(sessionId) {
+    if (!piSessions.has(sessionId)) {
+        piSessions.set(sessionId, {
+            systemPrompt: TEACHER_SYSTEM_PROMPT,
+            messages: [],
+            tools: TOOLS
+        });
+    }
+    return piSessions.get(sessionId);
+}
+
+async function executeTool(toolCall) {
+    const { name, arguments: args } = toolCall;
+    const tool = TOOLS.find(t => t.name === name);
+    if (!tool) throw new Error(`Unknown tool: ${name}`);
+    return await tool.execute(args);
+}
 
 // HTTPS 配置
 const USE_HTTPS = process.env.USE_HTTPS === 'true';
@@ -67,13 +177,242 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString(),
         config: {
             aiMode: AI_MODE,
+            llmProvider: AI_MODE === 'custom' ? LLM_PROVIDER : 'N/A',
+            llmModel: AI_MODE === 'custom' ? LLM_MODEL : 'N/A',
             volcConfigured: !!(process.env.VOLC_ACCESS_KEY && process.env.VOLC_SECRET_KEY),
             rtcConfigured: !!(process.env.VOLC_APP_ID && process.env.VOLC_APP_KEY),
             authEnabled: true
         },
         activeSessions: sessions.size,
+        piAgentSessions: piSessions.size,
         flow: 'frontend-creates-room'
     });
+});
+
+// ==================== 🤖 pi-agent-real API（真实 LLM） ====================
+
+/**
+ * pi-agent 健康检查
+ */
+app.get('/pi-agent/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        service: 'pi-agent-core-real',
+        provider: LLM_PROVIDER,
+        model: LLM_MODEL,
+        timestamp: new Date().toISOString(),
+        activeSessions: piSessions.size
+    });
+});
+
+/**
+ * Chat Completions API (SSE 流式)
+ * 兼容 OpenAI 和火山引擎 CustomLLM 格式
+ */
+app.post('/v1/chat/completions', async (req, res) => {
+    const requestId = `pi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    
+    console.log(`\n📥 [${requestId}] Received chat request (pi-agent)`);
+    
+    const {
+        messages = [],
+        stream = false,
+        temperature = 0.7,
+        max_tokens = 500,
+        top_p = 0.9,
+        model: requestedModel = LLM_MODEL,
+        session_id = 'default'
+    } = req.body;
+    
+    const sessionId = session_id || `session_${Date.now()}`;
+    const session = getOrCreatePiSession(sessionId);
+    
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Request-ID', requestId);
+    
+    try {
+        const userMessage = messages.filter(m => m.role === 'user').pop();
+        if (!userMessage) throw new Error('No user message found');
+        
+        session.messages.push({
+            role: 'user',
+            content: [{ type: 'text', text: userMessage.content }],
+            timestamp: Date.now()
+        });
+        
+        console.log(`💬 User: ${userMessage.content.substring(0, 50)}...`);
+        
+        const modelConfig = LLM_BASE_URL 
+            ? getModel(LLM_PROVIDER, requestedModel, { baseUrl: LLM_BASE_URL })
+            : getModel(LLM_PROVIDER, requestedModel);
+        
+        if (stream) {
+            const context = {
+                systemPrompt: session.systemPrompt,
+                messages: session.messages,
+                tools: session.tools
+            };
+            
+            const s = stream(modelConfig, context);
+            let toolCalls = [];
+            
+            for await (const event of s) {
+                if (event.type === 'text_delta') {
+                    res.write(`data: ${JSON.stringify({
+                        id: requestId,
+                        object: 'chat.completion.chunk',
+                        created: timestamp,
+                        model: requestedModel,
+                        choices: [{
+                            index: 0,
+                            finish_reason: null,
+                            delta: { content: event.delta }
+                        }],
+                        stream_options: { include_usage: true }
+                    })}\n\n`);
+                } else if (event.type === 'toolcall_end') {
+                    toolCalls.push(event.toolCall);
+                }
+            }
+            
+            const finalMessage = await s.result();
+            
+            if (toolCalls.length > 0) {
+                for (const toolCall of toolCalls) {
+                    try {
+                        const result = await executeTool(toolCall);
+                        session.messages.push({
+                            role: 'toolResult',
+                            toolCallId: toolCall.id,
+                            toolName: toolCall.name,
+                            content: [{ type: 'text', text: JSON.stringify(result) }],
+                            isError: false,
+                            timestamp: Date.now()
+                        });
+                        
+                        const continuation = await complete(modelConfig, {
+                            systemPrompt: session.systemPrompt,
+                            messages: session.messages,
+                            tools: session.tools
+                        });
+                        
+                        for (const block of continuation.content) {
+                            if (block.type === 'text') {
+                                res.write(`data: ${JSON.stringify({
+                                    id: requestId,
+                                    object: 'chat.completion.chunk',
+                                    created: timestamp,
+                                    model: requestedModel,
+                                    choices: [{
+                                        index: 0,
+                                        finish_reason: null,
+                                        delta: { content: block.text }
+                                    }],
+                                    stream_options: { include_usage: true }
+                                })}\n\n`);
+                            }
+                        }
+                        
+                        session.messages.push({
+                            role: 'assistant',
+                            content: continuation.content,
+                            timestamp: Date.now()
+                        });
+                    } catch (error) {
+                        console.error(`❌ Tool execution failed:`, error);
+                    }
+                }
+            } else {
+                session.messages.push({
+                    role: 'assistant',
+                    content: finalMessage.content,
+                    timestamp: Date.now()
+                });
+            }
+            
+            res.write(`data: ${JSON.stringify({
+                id: requestId,
+                object: 'chat.completion.chunk',
+                created: timestamp,
+                model: requestedModel,
+                choices: [{
+                    index: 0,
+                    finish_reason: 'stop',
+                    delta: {}
+                }],
+                usage: {
+                    prompt_tokens: finalMessage.usage?.input || 0,
+                    completion_tokens: finalMessage.usage?.output || 0,
+                    total_tokens: (finalMessage.usage?.input || 0) + (finalMessage.usage?.output || 0)
+                },
+                stream_options: { include_usage: true }
+            })}\n\n`);
+            
+            res.write('data: [DONE]\n\n');
+            res.end();
+            
+        } else {
+            const context = {
+                systemPrompt: session.systemPrompt,
+                messages: session.messages,
+                tools: session.tools
+            };
+            
+            const response = await complete(modelConfig, context);
+            
+            session.messages.push({
+                role: 'assistant',
+                content: response.content,
+                timestamp: Date.now()
+            });
+            
+            res.json({
+                id: requestId,
+                object: 'chat.completion',
+                created: timestamp,
+                model: requestedModel,
+                choices: [{
+                    index: 0,
+                    finish_reason: 'stop',
+                    message: {
+                        role: 'assistant',
+                        content: response.content.filter(b => b.type === 'text').map(b => b.text).join(' ')
+                    }
+                }],
+                usage: {
+                    prompt_tokens: response.usage?.input || 0,
+                    completion_tokens: response.usage?.output || 0,
+                    total_tokens: (response.usage?.input || 0) + (response.usage?.output || 0)
+                }
+            });
+        }
+        
+        console.log(`✅ [${requestId}] Response sent`);
+        
+    } catch (error) {
+        console.error(`❌ [${requestId}] Error:`, error);
+        
+        if (stream) {
+            res.write(`data: ${JSON.stringify({
+                id: requestId,
+                object: 'chat.completion.chunk',
+                created: timestamp,
+                model: requestedModel,
+                choices: [{
+                    index: 0,
+                    finish_reason: 'error',
+                    delta: { content: `Error: ${error.message}` }
+                }]
+            })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
+        } else {
+            res.status(500).json({ error: { message: error.message, type: 'agent_error' } });
+        }
+    }
 });
 
 // ==================== 🔐 认证接口 ====================

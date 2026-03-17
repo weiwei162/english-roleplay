@@ -5,8 +5,7 @@
   "main": "index-join-ai.js",
   "scripts": {
     "start": "node index-join-ai.js",
-    "start:pi-agent": "node pi-agent-real.js",
-    "start:pi-agent-mock": "node pi-agent-server.js",
+    "start:mock": "node pi-agent-server.js",
     "dev": "nodemon index-join-ai.js",
     "test": "node test-integration.js",
     "test:pi-agent": "node test-pi-agent.js"

@@ -3,40 +3,12 @@
 version: '3.8'
 
 services:
-  # PI-Agent-Core 服务（真实 LLM）
-  pi-agent:
-    build:
-      context: ./server
-      dockerfile: Dockerfile.pi-agent
-    container_name: english-roleplay-pi-agent
-    restart: unless-stopped
-    ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
-      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
-      - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_BASE_URL=${LLM_BASE_URL:-}
-      - PI_AGENT_PORT=${PI_AGENT_PORT:-3001}
-      - PI_AGENT_API_KEY=${PI_AGENT_API_KEY:-pi-agent-secret-key}
-    volumes:
-      - ./server/logs:/app/logs
-    networks:
-      - english-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-
-  # 主服务（火山引擎 RTC + 前端）
-  main-server:
+  # 单服务：主服务 + pi-agent 集成
+  english-roleplay:
     build:
       context: ./server
       dockerfile: Dockerfile.main
-    container_name: english-roleplay-main
+    container_name: english-roleplay
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -44,8 +16,10 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - AI_MODE=${AI_MODE:-custom}
-      - PI_AGENT_URL=${PI_AGENT_URL:-http://pi-agent:3001/v1/chat/completions}
-      - PI_AGENT_API_KEY=${PI_AGENT_API_KEY:-pi-agent-secret-key}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
       - PORT=${PORT:-3000}
       - USE_HTTPS=${USE_HTTPS:-false}
       - HTTPS_PORT=${HTTPS_PORT:-3443}
@@ -58,9 +32,6 @@ services:
       - VOLC_ASR_TOKEN=${VOLC_ASR_TOKEN:-}
       - VOLC_TTS_APP_ID=${VOLC_TTS_APP_ID:-}
       - VOLC_TTS_TOKEN=${VOLC_TTS_TOKEN:-}
-    depends_on:
-      pi-agent:
-        condition: service_healthy
     volumes:
       - ./server/logs:/app/logs
       - ./server/ssl:/app/ssl:ro

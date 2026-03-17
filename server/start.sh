@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # English-Roleplay 快速启动脚本
-# 包含 pi-agent-real (真实 LLM) 和主服务
+# 单服务模式（pi-agent 已集成到主服务）
 
 set -e
 
@@ -18,19 +18,19 @@ if [ ! -f .env ]; then
     echo ""
 fi
 
-# 检查 LLM_API_KEY
-if ! grep -q "LLM_API_KEY=sk-" .env; then
-    echo "❌ 错误：未设置 LLM_API_KEY"
-    echo ""
-    echo "请编辑 .env 文件并设置:"
-    echo "  LLM_API_KEY=your-api-key-here"
-    echo ""
-    echo "获取 API Key:"
-    echo "  - Anthropic: https://console.anthropic.com/"
-    echo "  - OpenAI: https://platform.openai.com/api-keys"
-    echo "  - Google: https://makersuite.google.com/app/apikey"
-    echo ""
-    exit 1
+# 检查 LLM_API_KEY（如果使用 custom 模式）
+if grep -q "AI_MODE=custom" .env; then
+    if ! grep -q "LLM_API_KEY=sk-" .env && ! grep -q "LLM_BASE_URL=" .env; then
+        echo "❌ 错误：AI_MODE=custom 但未设置 LLM_API_KEY 或 LLM_BASE_URL"
+        echo ""
+        echo "请编辑 .env 文件并设置:"
+        echo "  LLM_API_KEY=your-api-key-here"
+        echo ""
+        echo "或使用本地 Ollama:"
+        echo "  LLM_BASE_URL=http://localhost:11434/v1"
+        echo ""
+        exit 1
+    fi
 fi
 
 # 检查 node_modules
@@ -45,8 +45,8 @@ fi
 echo "📋 启动方式选择:"
 echo ""
 echo "  1) 开发模式 (自动重启)"
-echo "  2) 生产模式 (后台运行)"
-echo "  3) 仅测试 pi-agent-real"
+echo "  2) 生产模式 (前台运行)"
+echo "  3) 后台运行 (PM2)"
 echo "  4) 退出"
 echo ""
 read -p "请选择 [1-4]: " choice
@@ -56,34 +56,17 @@ case $choice in
         echo ""
         echo "🔧 启动开发模式..."
         echo ""
-        
-        # 启动 pi-agent-real
-        echo "🤖 启动 pi-agent-real (终端 1)..."
-        npm run start:pi-agent &
-        PI_AGENT_PID=$!
-        
-        sleep 3
-        
-        # 启动主服务
-        echo "🌐 启动主服务 (终端 2)..."
-        npm run dev &
-        MAIN_PID=$!
-        
-        echo ""
-        echo "✅ 服务已启动!"
-        echo ""
-        echo "访问地址：http://localhost:3000"
-        echo "pi-agent 健康检查：http://localhost:3001/health"
-        echo ""
-        echo "按 Ctrl+C 停止所有服务"
-        echo ""
-        
-        # 等待中断信号
-        trap "kill $PI_AGENT_PID $MAIN_PID 2>/dev/null; echo ''; echo '👋 服务已停止'; exit 0" INT
-        wait
+        npm run dev
         ;;
         
     2)
+        echo ""
+        echo "🔧 启动生产模式..."
+        echo ""
+        npm start
+        ;;
+        
+    3)
         echo ""
         echo "📦 检查 PM2..."
         if ! command -v pm2 &> /dev/null; then
@@ -92,57 +75,25 @@ case $choice in
         fi
         
         echo ""
-        echo "🔧 启动生产模式..."
+        echo "🔧 启动后台运行..."
         
         # 停止旧进程
-        pm2 stop all 2>/dev/null || true
-        pm2 delete all 2>/dev/null || true
+        pm2 stop english-roleplay 2>/dev/null || true
+        pm2 delete english-roleplay 2>/dev/null || true
         
-        # 启动 pi-agent-real
-        pm2 start pi-agent-real.js --name pi-agent
-        
-        sleep 3
-        
-        # 启动主服务
-        pm2 start index-join-ai.js --name main-server
+        # 启动服务
+        pm2 start index-join-ai.js --name english-roleplay
         
         echo ""
         echo "✅ 服务已启动!"
         echo ""
         echo "查看状态：pm2 status"
-        echo "查看日志：pm2 logs"
+        echo "查看日志：pm2 logs english-roleplay"
         echo "监控：pm2 monit"
-        echo "停止：pm2 stop all"
+        echo "停止：pm2 stop english-roleplay"
         echo ""
         echo "访问地址：http://localhost:3000"
         echo ""
-        ;;
-        
-    3)
-        echo ""
-        echo "🧪 启动 pi-agent-real 测试模式..."
-        echo ""
-        
-        # 启动 pi-agent-real
-        npm run start:pi-agent &
-        PI_AGENT_PID=$!
-        
-        sleep 3
-        
-        # 测试健康检查
-        echo ""
-        echo "📊 健康检查..."
-        curl -s http://localhost:3001/health | jq . || echo "⚠️  jq 未安装，跳过格式化"
-        
-        echo ""
-        echo "✅ pi-agent-real 已启动"
-        echo ""
-        echo "测试接口：curl http://localhost:3001/health"
-        echo "按 Ctrl+C 停止服务"
-        echo ""
-        
-        trap "kill $PI_AGENT_PID 2>/dev/null; echo ''; echo '👋 服务已停止'; exit 0" INT
-        wait
         ;;
         
     4)
