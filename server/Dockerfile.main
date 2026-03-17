@@ -21,10 +21,14 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# 从构建阶段复制 node_modules 和源代码
+# 从构建阶段复制 node_modules 和所有文件（包括前端）
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/*.js ./
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/*.html ./
+COPY --from=builder /app/js ./js
+COPY --from=builder /app/css ./css
+COPY --from=builder /app/assets ./assets 2>/dev/null || true
 
 # 创建日志和 SSL 目录
 RUN mkdir -p /app/logs /app/ssl && chown -R nodejs:nodejs /app
