@@ -1,0 +1,43 @@
+# Main Server Dockerfile
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# 复制 package 文件
+COPY package*.json ./
+
+# 安装所有依赖
+RUN npm ci
+
+# 复制源代码
+COPY . .
+
+# 生产阶段
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 创建非 root 用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# 从构建阶段复制 node_modules 和源代码
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/*.js ./
+COPY --from=builder /app/package.json ./
+
+# 创建日志和 SSL 目录
+RUN mkdir -p /app/logs /app/ssl && chown -R nodejs:nodejs /app
+
+# 切换到非 root 用户
+USER nodejs
+
+# 暴露端口
+EXPOSE 3000 3443
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# 启动命令
+CMD ["node", "index-join-ai.js"]
