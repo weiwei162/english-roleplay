@@ -1,303 +1,369 @@
-# 🎉 RTC 实时对话式 AI - 最终总结
+# English-Roleplay 完整开发总结
 
-**完成日期：** 2026-03-15  
-**版本：** v3.0.0  
-**状态：** ✅ 前后端集成完成，等待 API 凭证测试
+## 🎯 项目目标
 
----
-
-## 📋 完成清单
-
-### ✅ 已完成
-
-| 模块 | 状态 | 文件 |
-|------|------|------|
-| **火山 RTC 客户端** | ✅ | `server/volc-rtc-client.js` |
-| **服务端（RTC AI）** | ✅ | `server/index-rtc-ai.js` |
-| **前端集成** | ✅ | `js/app.js` |
-| **RTC 客户端** | ✅ | `js/rtc-client.js` |
-| **角色人设** | ✅ | 5 种角色配置 |
-| **API 接口** | ✅ | 创建/离开/切换房间 |
-| **文档** | ✅ | 4 份完整文档 |
-| **启动脚本** | ✅ | `npm run start:rtc-ai` |
-
-### ⏳ 待完成
-
-| 任务 | 依赖 | 说明 |
-|------|------|------|
-| **配置 API 凭证** | 🔴 火山账号 | 需要 AppID + AppKey |
-| **端到端测试** | 🔴 API 凭证 | 需要真实环境测试 |
-| **性能优化** | 🟡 测试结果 | 根据测试调整 |
+创建一个儿童英语对话学习应用，支持：
+1. 角色动画在场景中自由移动
+2. 使用真实 LLM（Claude/OpenAI 等）进行对话
+3. 内置教学工具（字典、评分、场景提示）
 
 ---
 
-## 🏗️ 完整架构
+## ✅ 完成功能
+
+### 1. 角色动态移动
+
+**实现方式**: 火山引擎字幕回调 + 位置循环
+
+- AI 每说完一句话，角色自动移动
+- 预设 5 个位置点（左/中/右/左中/右中）
+- 带跳跃动画效果
+
+**文件**:
+- `js/startvoicechat-client.js` - 字幕解析
+- `js/app.js` - 移动逻辑
+
+---
+
+### 2. PI-Agent-Core 集成
+
+#### 版本 1: 模拟实现 (`pi-agent-server.js`)
+- 简单的关键词匹配回复
+- 用于测试接口
+- 无需 API Key
+
+#### 版本 2: 真实实现 (`pi-agent-real.js`) ⭐
+- 基于 `@mariozechner/pi-ai` 包
+- 支持 OpenAI/Anthropic/Google/Ollama
+- 完整的工具调用系统
+- SSE 流式输出
+- 对话历史管理
+
+**内置工具**:
+1. **dictionary** - 查字典（13 个基础单词）
+2. **pronunciation_score** - 发音评分（80-100 分）
+3. **scene_hint** - 场景提示（4 个场景）
+
+---
+
+## 📁 文件结构
 
 ```
-用户操作
-    │
-    ├─ 选择角色 → currentCharacter
-    │
-    └─ 选择场景 → selectScene()
-                    │
-                    ▼
-              createAIVoiceChatRoom()
-                    │
-                    ├─ HTTP POST /api/create-room
-                    │       │
-                    │       ▼
-                    │   服务端调用 StartVoiceChat
-                    │       │
-                    │       ▼
-                    │   火山引擎创建虚拟 AI 用户
-                    │       │
-                    │       ▼
-                    │   返回 token + aiTaskId
-                    │
-                    ▼
-              rtcAvatarClient.join()
-                    │
-                    ▼
-              前端加入 RTC 房间
-                    │
-                    ▼
-              AI 自动回复（云端处理）
+english-roleplay/
+├── js/
+│   ├── app.js                      # 主应用逻辑
+│   ├── scenes.js                   # 场景数据（含位置配置）
+│   └── startvoicechat-client.js    # RTC 客户端（字幕解析）
+│
+├── server/
+│   ├── pi-agent-server.js          # 模拟 Agent（测试用）
+│   ├── pi-agent-real.js            # 真实 Agent（生产用）⭐
+│   ├── index-join-ai.js            # 主服务（火山引擎集成）
+│   ├── volc-start-voicechat.js     # 火山 API 客户端
+│   ├── test-pi-agent.js            # 接口测试脚本
+│   └── start.sh                    # 快速启动脚本
+│
+├── 文档/
+│   ├── CHARACTER-MOVE-FEATURE.md   # 角色移动功能文档
+│   ├── PI-AGENT-INTEGRATION.md     # CustomLLM 集成指南
+│   ├── PI-AGENT-REAL-GUIDE.md      # 真实 Agent 详细指南
+│   ├── QUICKSTART-PI-AGENT.md      # 快速配置指南 ⭐
+│   └── DEVELOPMENT-SUMMARY.md      # 开发总结
+│
+└── .env.example                     # 环境变量模板
 ```
 
 ---
 
-## 📁 核心文件
+## 🚀 快速开始
 
-### 前端
-
-| 文件 | 行数 | 功能 |
-|------|------|------|
-| `js/app.js` | ~900 | 主逻辑 + AI 房间集成 |
-| `js/rtc-client.js` | ~300 | RTC 客户端 |
-| `index.html` | ~200 | UI 界面 |
-
-### 服务端
-
-| 文件 | 行数 | 功能 |
-|------|------|------|
-| `server/index-rtc-ai.js` | ~400 | 服务端主逻辑 |
-| `server/volc-rtc-client.js` | ~250 | RTC OpenAPI 客户端 |
-| `server/.env` | ~20 | 环境配置 |
-
-### 文档
-
-| 文件 | 说明 |
-|------|------|
-| `INTEGRATION-GUIDE.md` | ⭐ 集成指南 |
-| `RTC-REALTIME-AI-PLAN.md` | 架构设计 |
-| `FINAL-SUMMARY.md` | 本文档 |
-| `README.md` | 项目说明 |
-
----
-
-## 🚀 启动流程
-
-### 1. 配置环境
+### 方式 1: 使用真实 LLM（推荐）
 
 ```bash
+# 1. 配置环境变量
 cd server
 cp .env.example .env
-```
+# 编辑 .env，设置 LLM_API_KEY
 
-编辑 `.env`：
-```bash
-VOLC_APP_ID=你的 app_id
-VOLC_APP_KEY=你的 app_key
-DASHSCOPE_API_KEY=sk-xxx  # 备用
-```
+# 2. 安装依赖
+npm install
 
-### 2. 启动服务
+# 3. 启动服务
+./start.sh
+# 选择 "1) 开发模式" 或 "2) 生产模式"
 
-```bash
-npm run start:rtc-ai
-```
-
-### 3. 浏览器访问
-
-```
+# 4. 访问
 http://localhost:3000
 ```
 
-### 4. 测试对话
+### 方式 2: 使用模拟 Agent（测试）
 
-1. 选择角色（Miss Emma）
-2. 选择场景（魔法动物园）
-3. 点击麦克风说话
-4. 听 AI 自动回复
+```bash
+# 启动模拟服务
+node pi-agent-server.js
+
+# 启动主服务
+npm start
+```
 
 ---
 
-## 🔑 关键代码
+## 🔧 配置选项
 
-### 前端：创建 AI 房间
+### AI 模式选择
+
+```bash
+# .env 文件
+
+# 模式 1: 端到端（火山豆包）
+AI_MODE=s2s
+
+# 模式 2: 分组件（ASR+LLM+TTS）
+AI_MODE=component
+
+# 模式 3: 第三方 LLM（pi-agent-core）⭐
+AI_MODE=custom
+```
+
+### LLM 提供商选择
+
+```bash
+# OpenAI（推荐）
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o-mini
+LLM_API_KEY=sk-proj-xxx
+
+# Anthropic Claude
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-sonnet-4-20250514
+LLM_API_KEY=sk-ant-api03-xxx
+
+# Google Gemini
+LLM_PROVIDER=google
+LLM_MODEL=gemini-2.0-flash
+LLM_API_KEY=xxx
+
+# Ollama 本地（免费）
+LLM_PROVIDER=ollama
+LLM_MODEL=llama3.2
+LLM_BASE_URL=http://localhost:11434/v1
+
+# OpenRouter（多模型）
+LLM_PROVIDER=openrouter
+LLM_MODEL=anthropic/claude-3.5-sonnet
+LLM_API_KEY=sk-or-xxx
+```
+
+---
+
+## 📊 架构图
+
+```
+┌─────────────┐
+│   浏览器    │  客户端
+│  (RTC+Web)  │
+└──────┬──────┘
+       │ RTC
+       ▼
+┌─────────────┐
+│ 火山引擎 RTC │  ASR + TTS
+│ (StartVoice)│
+└──────┬──────┘
+       │ HTTP SSE
+       ▼
+┌─────────────┐
+│ pi-agent-   │  LLM + 工具
+│   real.js   │
+└──────┬──────┘
+       │ HTTPS
+       ▼
+┌─────────────┐
+│ OpenAI/     │  真实大模型
+│ Anthropic/  │
+│ Google      │
+└─────────────┘
+```
+
+---
+
+## 🎨 使用场景
+
+### 场景 1: 魔法动物园 🦁
+
+- AI 介绍动物（lion, elephant, giraffe）
+- 角色移动到不同动物旁边
+- 孩子可以问 "What is a lion?"
+- AI 调用字典工具解释
+
+### 场景 2: 欢乐超市 🛒
+
+- 学习食物单词（apple, banana, carrot）
+- 角色在货架间移动
+- 练习 "I like apples"
+
+### 场景 3: 温馨小家 🏠
+
+- 日常对话练习
+- 学习早晨问候、早餐等
+
+### 场景 4: 快乐公园 🌳
+
+- 自然主题（sun, flower, frog）
+- 户外活动对话
+
+---
+
+## 🛠️ 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| 前端 | HTML5 + CSS3 + Vanilla JS |
+| 后端 | Node.js + Express |
+| RTC | 火山引擎 StartVoiceChat |
+| LLM | @mariozechner/pi-ai |
+| 模型 | GPT-4o/Claude/Gemini |
+| 部署 | PM2 + Nginx（可选） |
+
+---
+
+## 📈 Git 提交记录
+
+```bash
+# 最新提交
+3e3c020 - docs: 添加 pi-agent-real 快速配置指南
+000c771 - refactor: 使用 pi-ai 的 OpenAI-compatible API
+27b7401 - feat: 添加快速启动脚本 start.sh
+fb9a795 - feat: 集成真实 pi-agent-core
+3897f2d - docs: 添加开发总结文档
+effb4af - feat: 集成 pi-agent-core 第三方 LLM
+26831a0 - simplify: 角色自由移动
+5055df9 - feat: 角色动态移动功能
+```
+
+---
+
+## 📝 核心 API
+
+### 火山引擎 CustomLLM 配置
 
 ```javascript
-async function createAIVoiceChatRoom() {
-    // 1. 生成房间 ID
-    currentRoomId = `room_${currentCharacter.id}_${currentScene.id}_${Date.now()}`;
-    
-    // 2. 调用后端 API
-    const response = await fetch('/api/create-room', {
-        method: 'POST',
-        body: JSON.stringify({
-            roomId: currentRoomId,
-            character: currentCharacter.id
-        })
-    });
-    
-    const data = await response.json();
-    
-    // 3. 加入 RTC 房间
-    rtcAvatarClient.join(currentRoomId, data.token, 'child_' + Date.now());
+{
+  "LLMConfig": {
+    "Mode": "CustomLLM",
+    "Url": "http://localhost:3001/v1/chat/completions",
+    "APIKey": "Bearer pi-agent-secret-key",
+    "ModelName": "openai/gpt-4o-mini"
+  }
 }
 ```
 
-### 服务端：开启 AI 对话
+### pi-ai 使用示例
 
 ```javascript
-app.post('/api/create-room', async (req, res) => {
-    // 1. 生成 Token
-    const childToken = rtcClient.generateToken(roomId, 'child');
-    
-    // 2. 开启 AI 对话
-    const aiResult = await rtcClient.startVoiceChat({
-        roomId,
-        userId: `ai_${character}`,
-        persona: CHARACTER_PERSONAS[character].persona,
-        language: CHARACTER_PERSONAS[character].language
-    });
-    
-    // 3. 返回结果
-    res.json({
-        roomId,
-        token: childToken,
-        aiTaskId: aiResult.TaskId
-    });
-});
+const { getModel, stream, complete, Type } = require('@mariozechner/pi-ai');
+
+// 创建模型
+const model = getModel('openai', 'gpt-4o-mini');
+
+// 定义工具
+const tool = {
+  name: 'dictionary',
+  parameters: Type.Object({
+    word: Type.String()
+  }),
+  execute: async ({ word }) => {
+    return { definition: '...' };
+  }
+};
+
+// 流式对话
+const context = {
+  systemPrompt: 'You are a teacher.',
+  messages: [{ role: 'user', content: 'Hello' }],
+  tools: [tool]
+};
+
+const s = stream(model, context);
+for await (const event of s) {
+  if (event.type === 'text_delta') {
+    console.log(event.delta);
+  }
+}
+
+const result = await s.result();
 ```
 
 ---
 
-## 📊 代码统计
-
-| 项目 | 数量 |
-|------|------|
-| 前端代码 | ~1200 行 |
-| 服务端代码 | ~650 行 |
-| 文档 | ~1000 行 |
-| 总提交 | ~15 次 |
-
----
-
-## 🎯 下一步
-
-### 立即可做（无需凭证）
+## 🔍 测试命令
 
 ```bash
-# 1. 查看文档
-cat INTEGRATION-GUIDE.md
+# 健康检查
+curl http://localhost:3001/health
 
-# 2. 检查代码
-git log --oneline -10
+# 测试聊天
+curl -X POST http://localhost:3001/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Hello!"}],"stream":false}'
 
-# 3. 准备测试环境
-# 确保 Node.js 16+
-# 确保 Python 3.7+（用于 TTS）
-```
-
-### 需要凭证
-
-```bash
-# 4. 配置 .env
-VOLC_APP_ID=你的 app_id
-VOLC_APP_KEY=你的 app_key
-
-# 5. 启动测试
-npm run start:rtc-ai
-
-# 6. 浏览器访问
-# http://localhost:3000
+# 测试工具调用
+curl -X POST http://localhost:3001/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"What is a lion?"}],"stream":false}'
 ```
 
 ---
 
-## 📚 文档索引
+## 🎯 下一步优化
 
-| 文档 | 用途 |
-|------|------|
-| [`INTEGRATION-GUIDE.md`](INTEGRATION-GUIDE.md) | ⭐ 完整集成指南 |
-| [`RTC-REALTIME-AI-PLAN.md`](RTC-REALTIME-AI-PLAN.md) | 架构设计 |
-| [`README-RTC-OPENAPI.md`](README-RTC-OPENAPI.md) | 旧版文档（参考） |
-| [`FINAL-SUMMARY.md`](FINAL-SUMMARY.md) | 本文档 |
+### 短期
+- [ ] 添加更多字典单词（100+）
+- [ ] 改进发音评分（使用真实 API）
+- [ ] 添加更多场景（学校、医院等）
+- [ ] 角色移动路径平滑化
 
----
+### 中期
+- [ ] Redis 持久化对话历史
+- [ ] 用户账户系统
+- [ ] 学习进度跟踪
+- [ ] 家长控制面板
 
-## ✅ 验收标准
-
-### 功能验收
-
-- [x] 前端可以选择角色和场景
-- [x] 前端调用后端创建 AI 房间
-- [x] 服务端调用 StartVoiceChat
-- [x] 前端加入 RTC 房间
-- [x] AI 自动回复（待真实测试）
-
-### 代码质量
-
-- [x] 语法检查通过
-- [x] 代码结构清晰
-- [x] 注释完整
-- [x] 文档齐全
-
-### 性能指标
-
-- [ ] 延迟 < 2 秒（待测试）
-- [ ] 识别准确率 > 90%（待测试）
-- [ ] 并发支持 > 100（待测试）
+### 长期
+- [ ] 多语言支持
+- [ ] 移动端 App
+- [ ] 离线模式
+- [ ] AI 生成个性化内容
 
 ---
 
-## 🎉 总结
+## 📚 参考文档
 
-### 核心成果
-
-1. **✅ 前后端完整集成**
-   - 前端调用 `/api/create-room`
-   - 服务端调用 `StartVoiceChat`
-   - 前端加入 RTC 房间
-   - AI 自动回复
-
-2. **✅ 架构清晰**
-   - 火山 RTC 实时对话式 AI
-   - 云端一站式处理（ASR+NLP+TTS）
-   - 低延迟（~1.5 秒）
-
-3. **✅ 文档完整**
-   - 集成指南
-   - 架构设计
-   - 使用文档
-
-### 下一步
-
-**只需要配置火山 API 凭证，就可以开始真实测试了！**
-
-```bash
-# 配置 .env
-VOLC_APP_ID=你的 app_id
-VOLC_APP_KEY=你的 app_key
-
-# 启动
-npm run start:rtc-ai
-
-# 测试
-# http://localhost:3000
-```
+- [火山引擎 StartVoiceChat](https://www.volcengine.com/docs/6348/1558163)
+- [CustomLLM 接入](https://www.volcengine.com/docs/6348/1399966)
+- [pi-ai 文档](https://github.com/badlogic/pi-mono/tree/main/packages/ai)
+- [pi-agent-core](https://github.com/badlogic/pi-mono/tree/main/packages/agent)
+- [OpenAI API](https://platform.openai.com/docs)
+- [Anthropic API](https://docs.anthropic.com)
 
 ---
 
-**开发完成！等待 API 凭证进行真实测试！** 🚀✨
+## 👥 团队
+
+- **开发**: AI Assistant
+- **时间**: 2026-03-17
+- **版本**: v3.2.0
+- **License**: MIT
+
+---
+
+## 🎉 完成状态
+
+✅ 角色动态移动  
+✅ 真实 LLM 集成  
+✅ 工具调用系统  
+✅ SSE 流式输出  
+✅ 对话历史管理  
+✅ 快速启动脚本  
+✅ 完整文档  
+
+**项目已就绪，可以开始使用！** 🚀
