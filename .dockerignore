@@ -1,0 +1,49 @@
+# Docker ignore for English-Roleplay
+
+# 依赖
+node_modules
+npm-debug.log
+
+# Git
+.git
+.gitignore
+
+# 文档
+*.md
+!README.md
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 日志
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode
+.idea
+
+# 构建产物
+coverage
+.nyc_output
+dist
+build
+*.tgz
+
+# 运行时
+logs
+ssl
+*.key
+*.pem
+!*.example
+
+# 用户数据
+user.json

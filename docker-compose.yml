@@ -6,8 +6,8 @@ services:
   # 单服务：主服务 + pi-agent 集成
   english-roleplay:
     build:
-      context: ./server
-      dockerfile: Dockerfile.main
+      context: .
+      dockerfile: server/Dockerfile.main
     container_name: english-roleplay
     restart: unless-stopped
     ports:
