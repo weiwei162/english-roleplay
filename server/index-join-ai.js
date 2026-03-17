@@ -22,6 +22,7 @@ const { register, login, authMiddleware, optionalAuth } = require('./auth');
 
 // pi-ai 集成（真实 LLM）
 // 文档：https://github.com/badlogic/pi-mono/tree/main/packages/ai
+// 注意：使用 @mariozechner/pi-ai，不是 pi-agent-core
 const { getModel, stream, complete, Type } = require('@mariozechner/pi-ai');
 
 require('dotenv').config();
@@ -32,7 +33,7 @@ app.use(express.json());
 
 // ==================== 配置 ====================
 
-const AI_MODE = process.env.AI_MODE || 's2s'; // 'component', 's2s', 或 'custom' (pi-agent-core)
+const AI_MODE = process.env.AI_MODE || 's2s'; // 'component', 's2s', 或 'custom' (pi-ai)
 const PORT = parseInt(process.env.PORT) || 3000;
 
 // ==================== pi-agent-real 集成（真实 LLM） ====================
@@ -162,7 +163,7 @@ const sessions = new Map();
 // ==================== 静态文件 ====================
 
 console.log('📁 Serving frontend from:', frontendPath);
-console.log(`🤖 AI Mode: ${AI_MODE === 'component' ? '分组件模式' : AI_MODE === 'custom' ? '第三方 LLM (pi-agent-core)' : '端到端模式 (S2S)'}`);
+console.log(`🤖 AI Mode: ${AI_MODE === 'component' ? '分组件模式' : AI_MODE === 'custom' ? '第三方 LLM (pi-ai)' : '端到端模式 (S2S)'}`);
 console.log('🔄 Flow: Frontend creates room → AI joins via backend');
 
 app.use(express.static(frontendPath, {
@@ -198,7 +199,7 @@ app.get('/health', (req, res) => {
 app.get('/pi-agent/health', (req, res) => {
     res.json({
         status: 'ok',
-        service: 'pi-agent-core-real',
+        service: 'pi-ai-real',
         provider: LLM_PROVIDER,
         model: LLM_MODEL,
         timestamp: new Date().toISOString(),
@@ -660,7 +661,7 @@ app.post('/api/join-ai', optionalAuth, async (req, res) => {
             });
             
         } else if (AI_MODE === 'custom') {
-            // ========== 第三方 CustomLLM 模式 (pi-agent-core) ==========
+            // ========== 第三方 CustomLLM 模式 (pi-ai) ==========
             console.log(`🤖 [CustomLLM 模式] AI joining room: ${roomId}, Scene: ${sceneId}`);
             
             const config = getCustomLLMConfig({

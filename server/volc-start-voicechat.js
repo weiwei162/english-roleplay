@@ -560,4 +560,3 @@ module.exports = {
     CHARACTER_CONFIGS,
     test
 };
-};
