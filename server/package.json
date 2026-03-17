@@ -1,15 +1,20 @@
 {
   "name": "english-friend-server",
-  "version": "3.1.0",
-  "description": "English Friend AI - VolcEngine StartVoiceChat Edition",
+  "version": "3.2.0",
+  "description": "English Friend AI - VolcEngine StartVoiceChat Edition with PI-Agent-Core",
   "main": "index-join-ai.js",
   "scripts": {
     "start": "node index-join-ai.js",
+    "start:pi-agent": "node pi-agent-real.js",
+    "start:pi-agent-mock": "node pi-agent-server.js",
     "dev": "nodemon index-join-ai.js",
-    "test": "node test-integration.js"
+    "test": "node test-integration.js",
+    "test:pi-agent": "node test-pi-agent.js"
   },
   "dependencies": {
     "@volcengine/rtc": "^4.68.1",
+    "@mariozechner/pi-agent-core": "^0.1.0",
+    "@mariozechner/pi-ai": "^0.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
@@ -19,14 +24,15 @@
     "nodemon": "^3.0.2"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   },
   "keywords": [
     "volcengine",
     "startvoicechat",
     "rtc",
     "english-learning",
-    "ai-tutor"
+    "ai-tutor",
+    "pi-agent-core"
   ],
   "author": "English Friend Team",
   "license": "MIT"
