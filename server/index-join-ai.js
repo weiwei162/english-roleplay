@@ -21,6 +21,7 @@ const { generateToken, generateWildcardToken, verifyToken } = require('./token-g
 const { register, login, authMiddleware, optionalAuth } = require('./auth');
 
 // pi-ai 集成（真实 LLM）
+// 文档：https://github.com/badlogic/pi-mono/tree/main/packages/ai
 const { getModel, stream, complete, Type } = require('@mariozechner/pi-ai');
 
 require('dotenv').config();
