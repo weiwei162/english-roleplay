@@ -235,10 +235,10 @@ function handleCharacterClick() {
 }
 
 /**
- * 处理 AI 字幕事件 - 根据 AI 说话内容移动角色
+ * 处理 AI 字幕事件 - 让角色在画布中自由移动
  * @param {Object} subtitle - 字幕数据
  */
-let lastSubtitleText = ''; // 避免重复处理
+let aiSpeakCount = 0; // AI 说话次数计数器
 
 function handleAISubtitle(subtitle) {
     if (!subtitle || !subtitle.data || !Array.isArray(subtitle.data)) return;
@@ -250,46 +250,39 @@ function handleAISubtitle(subtitle) {
         // 只处理 AI 的字幕（userId 以 ai_ 开头）
         if (!userId || !userId.startsWith('ai_')) continue;
         
-        // 避免重复处理相同的字幕
-        if (text === lastSubtitleText) continue;
-        
-        console.log('🤖 AI subtitle:', text, '| paragraph:', paragraph, '| definite:', definite);
-        
-        // 当 AI 开始说完整的一句话时（paragraph: true），移动角色到对应位置
+        // 当 AI 说完完整一句话时，让角色移动一下
         if (paragraph && definite) {
-            lastSubtitleText = text;
+            aiSpeakCount++;
             
-            // 查找匹配的对话（根据文本内容模糊匹配）
-            const dialogueIndex = currentScene.dialogues.findIndex(d => {
-                if (!d.text) return false;
-                // 检查是否包含关键词（前 15 个字符或主要单词）
-                const shortText = d.text.substring(0, 15).split(' ').slice(0, 3).join(' ');
-                return text.includes(shortText) || d.text.includes(text.substring(0, 15));
-            });
+            console.log(`🤖 AI spoke #${aiSpeakCount}:`, text);
             
-            if (dialogueIndex >= 0) {
-                const dialogue = currentScene.dialogues[dialogueIndex];
-                currentDialogueIndex = dialogueIndex;
-                
-                console.log('✅ Matched dialogue:', dialogue.text);
-                
-                // 如果对话配置了角色位置，移动角色
-                if (dialogue.characterPosition) {
-                    console.log('🚶 Moving character to:', dialogue.characterPosition);
-                    moveCharacterTo(
-                        dialogue.characterPosition.x,
-                        dialogue.characterPosition.y,
-                        { jump: true }
-                    );
-                }
-                
-                // 显示对应的媒体内容
-                if (dialogue.media) {
-                    showMediaContent(dialogue.media);
-                }
-            }
+            // 让角色在不同位置之间循环移动
+            moveCharacterRandomly(aiSpeakCount);
         }
     }
+}
+
+/**
+ * 让角色随机移动（循环几个预设位置）
+ * @param {number} count - 说话次数
+ */
+function moveCharacterRandomly(count) {
+    // 预设几个位置点（左、中、右）
+    const positions = [
+        { x: 25, y: 60 },  // 左边
+        { x: 50, y: 60 },  // 中间
+        { x: 75, y: 60 },  // 右边
+        { x: 40, y: 65 },  // 左中
+        { x: 60, y: 65 }   // 右中
+    ];
+    
+    // 根据说话次数循环选择位置
+    const posIndex = (count - 1) % positions.length;
+    const pos = positions[posIndex];
+    
+    console.log(`🚶 Moving character to position ${posIndex + 1}:`, pos);
+    
+    moveCharacterTo(pos.x, pos.y, { jump: true });
 }
 
 // ==================== ⭐ StartVoiceChat AI 语音对话集成（正确流程） ====================
