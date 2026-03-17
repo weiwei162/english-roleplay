@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * 火山引擎 StartVoiceChat API 服务端 - AI 加入房间模式
+ * 集成 OpenAI 兼容 LLM
  * 
  * 流程：
  * 1. 前端创建 RTC 房间并加入
@@ -19,12 +20,6 @@ const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLM
 const { combineCharacterAndScenePrompt, getScenePrompt } = require('./prompts');
 const { generateToken, generateWildcardToken, verifyToken } = require('./token-generator');
 const { register, login, authMiddleware, optionalAuth } = require('./auth');
-
-// pi-ai 集成（真实 LLM）
-// 文档：https://github.com/badlogic/pi-mono/tree/main/packages/ai
-// 注意：使用 @mariozechner/pi-ai，不是 pi-agent-core
-const { getModel, stream, complete, Type } = require('@mariozechner/pi-ai');
-
 require('dotenv').config();
 
 const app = express();
@@ -33,114 +28,8 @@ app.use(express.json());
 
 // ==================== 配置 ====================
 
-const AI_MODE = process.env.AI_MODE || 's2s'; // 'component', 's2s', 或 'custom' (pi-ai)
+const AI_MODE = process.env.AI_MODE || 's2s'; // 'component', 's2s', 或 'custom'
 const PORT = parseInt(process.env.PORT) || 3000;
-
-// ==================== pi-agent-real 集成（真实 LLM） ====================
-
-const LLM_PROVIDER = process.env.LLM_PROVIDER || 'openai';
-const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
-const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_BASE_URL = process.env.LLM_BASE_URL;
-
-// 系统提示词 - 英语老师角色
-const TEACHER_SYSTEM_PROMPT = `You are a friendly and encouraging English teacher for kids aged 6-10.
-
-Your role is to:
-- Speak in simple, clear English with short sentences
-- Use common vocabulary suitable for children
-- Be patient, supportive, and enthusiastic
-- Ask follow-up questions to encourage conversation
-- Praise the child's efforts frequently
-- Make learning fun and engaging
-
-Important rules:
-- Always respond in English only
-- Keep responses under 30 words for better TTS
-- Use emojis to make it fun 🦁🌟🎉
-- Ask one question at a time
-- Be encouraging: "Great job!", "Excellent!", "Well done!"`;
-
-// 工具定义
-const dictionaryTool = {
-    name: 'dictionary',
-    description: 'Look up the meaning of an English word for kids',
-    parameters: Type.Object({
-        word: Type.String({ description: 'The English word to look up' })
-    }),
-    execute: async ({ word }) => {
-        const definitions = {
-            'lion': 'A big yellow cat that roars. King of animals! 🦁',
-            'elephant': 'A very big gray animal with a long nose (trunk). 🐘',
-            'giraffe': 'A very tall animal with a long neck. 🦒',
-            'monkey': 'A playful animal that loves bananas. 🐵',
-            'zebra': 'A horse with black and white stripes. 🦓',
-            'apple': 'A red or green fruit. Crunchy and sweet! 🍎',
-            'banana': 'A yellow curved fruit. Monkeys love it! 🍌',
-            'carrot': 'An orange vegetable. Rabbits love carrots! 🥕',
-            'milk': 'A white drink. Makes you strong! 🥛',
-            'sun': 'The bright yellow thing in the sky. Gives us light! ☀️',
-            'flower': 'A beautiful colorful plant. Smells nice! 🌸',
-            'frog': 'A green animal that jumps and says "ribbit"! 🐸',
-            'butterfly': 'A colorful flying insect. Very pretty! 🦋'
-        };
-        const definition = definitions[word.toLowerCase()] || `Sorry, I don't know the word "${word}" yet. Let me explain it simply!`;
-        return { word, definition, example: `Example: "The ${word} is fun!"` };
-    }
-};
-
-const pronunciationTool = {
-    name: 'pronunciation_score',
-    description: 'Score the pronunciation of an English word or sentence',
-    parameters: Type.Object({
-        text: Type.String({ description: 'The text to score' })
-    }),
-    execute: async ({ text }) => {
-        const score = Math.floor(Math.random() * 20) + 80;
-        let feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : score >= 85 ? "Great job! 👍" : "Good try! 😊";
-        return { score, feedback, tips: `Great job saying "${text}"!` };
-    }
-};
-
-const sceneHintTool = {
-    name: 'scene_hint',
-    description: 'Get conversation hints for the current learning scene',
-    parameters: Type.Object({
-        scene: Type.String({ enum: ['zoo', 'market', 'home', 'park'], description: 'The current scene' })
-    }),
-    execute: async ({ scene }) => {
-        const hints = {
-            zoo: { topic: 'Animals', questions: ["What's your favorite animal?"], vocabulary: ['lion', 'elephant', 'giraffe'] },
-            market: { topic: 'Food', questions: ["What fruit do you like?"], vocabulary: ['apple', 'banana', 'carrot'] },
-            home: { topic: 'Daily Routine', questions: ["What time do you wake up?"], vocabulary: ['morning', 'breakfast'] },
-            park: { topic: 'Nature', questions: ["Do you like sunny days?"], vocabulary: ['sun', 'flower', 'frog'] }
-        };
-        return hints[scene] || { topic: 'Conversation', questions: ['Tell me more!'], vocabulary: [] };
-    }
-};
-
-const TOOLS = [dictionaryTool, pronunciationTool, sceneHintTool];
-
-// 会话管理（pi-agent）
-const piSessions = new Map();
-
-function getOrCreatePiSession(sessionId) {
-    if (!piSessions.has(sessionId)) {
-        piSessions.set(sessionId, {
-            systemPrompt: TEACHER_SYSTEM_PROMPT,
-            messages: [],
-            tools: TOOLS
-        });
-    }
-    return piSessions.get(sessionId);
-}
-
-async function executeTool(toolCall) {
-    const { name, arguments: args } = toolCall;
-    const tool = TOOLS.find(t => t.name === name);
-    if (!tool) throw new Error(`Unknown tool: ${name}`);
-    return await tool.execute(args);
-}
 
 // HTTPS 配置
 const USE_HTTPS = process.env.USE_HTTPS === 'true';
@@ -160,10 +49,94 @@ const client = new VolcStartVoiceChatClient({
 // 会话存储
 const sessions = new Map();
 
+// ==================== pi-agent-core 集成（真实 Agent） ====================
+
+const { Agent } = require('@mariozechner/pi-agent-core');
+const { getModel } = require('@mariozechner/pi-ai');
+
+const LLM_PROVIDER = process.env.LLM_PROVIDER || 'openai';
+const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+const LLM_API_KEY = process.env.LLM_API_KEY;
+const LLM_BASE_URL = process.env.LLM_BASE_URL;
+
+const TEACHER_SYSTEM_PROMPT = `You are a friendly and encouraging English teacher for kids aged 6-10.
+
+Your role:
+- Speak in simple, clear English
+- Use short sentences (under 30 words)
+- Be patient and supportive
+- Use emojis 🦁🌟🎉
+- Ask follow-up questions
+- Praise frequently
+
+Always respond in English only.`;
+
+// 工具定义（pi-agent-core 格式）
+const dictionaryTool = {
+    name: 'dictionary',
+    description: 'Look up the meaning of an English word for kids',
+    parameters: {
+        type: 'object',
+        properties: {
+            word: { type: 'string', description: 'The English word to look up' }
+        },
+        required: ['word']
+    },
+    execute: async ({ word }) => {
+        const definitions = {
+            'lion': 'A big yellow cat that roars. King of animals! 🦁',
+            'elephant': 'A very big gray animal with a long nose (trunk). 🐘',
+            'giraffe': 'A very tall animal with a long neck. 🦒',
+            'monkey': 'A playful animal that loves bananas. 🐵',
+            'apple': 'A red or green fruit. Crunchy and sweet! 🍎',
+            'banana': 'A yellow curved fruit. Monkeys love it! 🍌'
+        };
+        return { word, definition: definitions[word.toLowerCase()] || 'A special word!', example: `Example: "The ${word} is fun!"` };
+    }
+};
+
+const pronunciationTool = {
+    name: 'pronunciation_score',
+    description: 'Score the pronunciation of an English word',
+    parameters: {
+        type: 'object',
+        properties: {
+            text: { type: 'string', description: 'The text to score' }
+        },
+        required: ['text']
+    },
+    execute: async ({ text }) => {
+        const score = Math.floor(Math.random() * 20) + 80;
+        const feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : "Great job! 👍";
+        return { score, feedback };
+    }
+};
+
+const TOOLS = [dictionaryTool, pronunciationTool];
+
+// Agent 会话管理
+const piAgents = new Map();
+
+function getOrCreateAgent(sessionId) {
+    if (!piAgents.has(sessionId)) {
+        const agent = new Agent({
+            initialState: {
+                systemPrompt: TEACHER_SYSTEM_PROMPT,
+                model: getModel(LLM_PROVIDER, LLM_MODEL),
+                thinkingLevel: 'off',
+                tools: TOOLS,
+                messages: []
+            }
+        });
+        piAgents.set(sessionId, agent);
+    }
+    return piAgents.get(sessionId);
+}
+
 // ==================== 静态文件 ====================
 
 console.log('📁 Serving frontend from:', frontendPath);
-console.log(`🤖 AI Mode: ${AI_MODE === 'component' ? '分组件模式' : AI_MODE === 'custom' ? '第三方 LLM (pi-ai)' : '端到端模式 (S2S)'}`);
+console.log(`🤖 AI Mode: ${AI_MODE === 'component' ? '分组件模式' : AI_MODE === 'custom' ? '第三方 LLM (OpenAI)' : '端到端模式 (S2S)'}`);
 console.log('🔄 Flow: Frontend creates room → AI joins via backend');
 
 app.use(express.static(frontendPath, {
@@ -191,591 +164,155 @@ app.get('/health', (req, res) => {
     });
 });
 
-// ==================== 🤖 pi-agent-real API（真实 LLM） ====================
-
-/**
- * pi-agent 健康检查
- */
 app.get('/pi-agent/health', (req, res) => {
     res.json({
         status: 'ok',
-        service: 'pi-ai-real',
+        service: 'pi-agent-core',
         provider: LLM_PROVIDER,
         model: LLM_MODEL,
         timestamp: new Date().toISOString(),
-        activeSessions: piSessions.size
+        activeAgents: piAgents.size
     });
 });
 
-/**
- * Chat Completions API (SSE 流式)
- * 兼容 OpenAI 和火山引擎 CustomLLM 格式
- */
+// ==================== Chat API (pi-agent-core) ====================
+
 app.post('/v1/chat/completions', async (req, res) => {
-    const requestId = `pi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `pi-${Date.now()}`;
     const timestamp = Math.floor(Date.now() / 1000);
-    
-    console.log(`\n📥 [${requestId}] Received chat request (pi-agent)`);
     
     const {
         messages = [],
         stream = false,
-        temperature = 0.7,
-        max_tokens = 500,
-        top_p = 0.9,
-        model: requestedModel = LLM_MODEL,
         session_id = 'default'
     } = req.body;
     
     const sessionId = session_id || `session_${Date.now()}`;
-    const session = getOrCreatePiSession(sessionId);
-    
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Request-ID', requestId);
+    const agent = getOrCreateAgent(sessionId);
     
     try {
         const userMessage = messages.filter(m => m.role === 'user').pop();
-        if (!userMessage) throw new Error('No user message found');
-        
-        session.messages.push({
-            role: 'user',
-            content: [{ type: 'text', text: userMessage.content }],
-            timestamp: Date.now()
-        });
-        
-        console.log(`💬 User: ${userMessage.content.substring(0, 50)}...`);
-        
-        const modelConfig = LLM_BASE_URL 
-            ? getModel(LLM_PROVIDER, requestedModel, { baseUrl: LLM_BASE_URL })
-            : getModel(LLM_PROVIDER, requestedModel);
+        if (!userMessage) {
+            return res.status(400).json({ error: 'No user message' });
+        }
         
         if (stream) {
-            const context = {
-                systemPrompt: session.systemPrompt,
-                messages: session.messages,
-                tools: session.tools
-            };
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('X-Request-ID', requestId);
             
-            const s = stream(modelConfig, context);
-            let toolCalls = [];
+            let assistantMessage = '';
             
-            for await (const event of s) {
-                if (event.type === 'text_delta') {
+            const unsubscribe = agent.subscribe((event) => {
+                if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
+                    const delta = event.assistantMessageEvent.delta;
+                    assistantMessage += delta;
+                    
                     res.write(`data: ${JSON.stringify({
                         id: requestId,
                         object: 'chat.completion.chunk',
                         created: timestamp,
-                        model: requestedModel,
+                        model: LLM_MODEL,
                         choices: [{
                             index: 0,
                             finish_reason: null,
-                            delta: { content: event.delta }
-                        }],
-                        stream_options: { include_usage: true }
+                            delta: { content: delta }
+                        }]
                     })}\n\n`);
-                } else if (event.type === 'toolcall_end') {
-                    toolCalls.push(event.toolCall);
                 }
-            }
+            });
             
-            const finalMessage = await s.result();
-            
-            if (toolCalls.length > 0) {
-                for (const toolCall of toolCalls) {
-                    try {
-                        const result = await executeTool(toolCall);
-                        session.messages.push({
-                            role: 'toolResult',
-                            toolCallId: toolCall.id,
-                            toolName: toolCall.name,
-                            content: [{ type: 'text', text: JSON.stringify(result) }],
-                            isError: false,
-                            timestamp: Date.now()
-                        });
-                        
-                        const continuation = await complete(modelConfig, {
-                            systemPrompt: session.systemPrompt,
-                            messages: session.messages,
-                            tools: session.tools
-                        });
-                        
-                        for (const block of continuation.content) {
-                            if (block.type === 'text') {
-                                res.write(`data: ${JSON.stringify({
-                                    id: requestId,
-                                    object: 'chat.completion.chunk',
-                                    created: timestamp,
-                                    model: requestedModel,
-                                    choices: [{
-                                        index: 0,
-                                        finish_reason: null,
-                                        delta: { content: block.text }
-                                    }],
-                                    stream_options: { include_usage: true }
-                                })}\n\n`);
-                            }
-                        }
-                        
-                        session.messages.push({
-                            role: 'assistant',
-                            content: continuation.content,
-                            timestamp: Date.now()
-                        });
-                    } catch (error) {
-                        console.error(`❌ Tool execution failed:`, error);
-                    }
-                }
-            } else {
-                session.messages.push({
-                    role: 'assistant',
-                    content: finalMessage.content,
-                    timestamp: Date.now()
-                });
-            }
+            await agent.prompt(userMessage.content);
+            await agent.waitForIdle();
+            unsubscribe();
             
             res.write(`data: ${JSON.stringify({
                 id: requestId,
                 object: 'chat.completion.chunk',
                 created: timestamp,
-                model: requestedModel,
-                choices: [{
-                    index: 0,
-                    finish_reason: 'stop',
-                    delta: {}
-                }],
-                usage: {
-                    prompt_tokens: finalMessage.usage?.input || 0,
-                    completion_tokens: finalMessage.usage?.output || 0,
-                    total_tokens: (finalMessage.usage?.input || 0) + (finalMessage.usage?.output || 0)
-                },
-                stream_options: { include_usage: true }
+                model: LLM_MODEL,
+                choices: [{ index: 0, finish_reason: 'stop', delta: {} }]
             })}\n\n`);
-            
             res.write('data: [DONE]\n\n');
             res.end();
             
         } else {
-            const context = {
-                systemPrompt: session.systemPrompt,
-                messages: session.messages,
-                tools: session.tools
-            };
+            let assistantMessage = '';
             
-            const response = await complete(modelConfig, context);
-            
-            session.messages.push({
-                role: 'assistant',
-                content: response.content,
-                timestamp: Date.now()
+            const unsubscribe = agent.subscribe((event) => {
+                if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
+                    assistantMessage += event.assistantMessageEvent.delta;
+                }
             });
+            
+            await agent.prompt(userMessage.content);
+            await agent.waitForIdle();
+            unsubscribe();
             
             res.json({
                 id: requestId,
                 object: 'chat.completion',
                 created: timestamp,
-                model: requestedModel,
+                model: LLM_MODEL,
                 choices: [{
                     index: 0,
                     finish_reason: 'stop',
-                    message: {
-                        role: 'assistant',
-                        content: response.content.filter(b => b.type === 'text').map(b => b.text).join(' ')
-                    }
-                }],
-                usage: {
-                    prompt_tokens: response.usage?.input || 0,
-                    completion_tokens: response.usage?.output || 0,
-                    total_tokens: (response.usage?.input || 0) + (response.usage?.output || 0)
-                }
+                    message: { role: 'assistant', content: assistantMessage }
+                }]
             });
         }
-        
-        console.log(`✅ [${requestId}] Response sent`);
-        
     } catch (error) {
-        console.error(`❌ [${requestId}] Error:`, error);
-        
+        console.error('Chat API error:', error);
         if (stream) {
-            res.write(`data: ${JSON.stringify({
-                id: requestId,
-                object: 'chat.completion.chunk',
-                created: timestamp,
-                model: requestedModel,
-                choices: [{
-                    index: 0,
-                    finish_reason: 'error',
-                    delta: { content: `Error: ${error.message}` }
-                }]
-            })}\n\n`);
+            res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
             res.write('data: [DONE]\n\n');
             res.end();
         } else {
-            res.status(500).json({ error: { message: error.message, type: 'agent_error' } });
+            res.status(500).json({ error: error.message });
         }
     }
 });
 
-// ==================== 🔐 认证接口 ====================
+// ==================== 认证接口 ====================
 
-/**
- * 用户注册
- */
 app.post('/api/auth/register', (req, res) => {
     const { username, password, parentEmail } = req.body;
     
-    // 验证输入
     if (!username || !password) {
-        return res.status(400).json({
-            success: false,
-            error: 'Username and password are required'
-        });
+        return res.status(400).json({ success: false, error: 'Username and password required' });
     }
     
     if (username.length < 3) {
-        return res.status(400).json({
-            success: false,
-            error: 'Username must be at least 3 characters'
-        });
+        return res.status(400).json({ success: false, error: 'Username must be at least 3 characters' });
     }
     
-    if (password.length < 4) {
-        return res.status(400).json({
-            success: false,
-            error: 'Password must be at least 4 characters'
-        });
-    }
-    
-    const result = register(username, password, parentEmail || '');
-    
-    if (result.success) {
-        console.log(`✅ User registered: ${username}`);
-        res.json(result);
-    } else {
-        console.log(`❌ Register failed: ${result.error}`);
-        res.status(400).json(result);
+    try {
+        register(username, password, parentEmail);
+        res.json({ success: true, message: 'Registration successful' });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
     }
 });
 
-/**
- * 用户登录
- */
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     
     if (!username || !password) {
-        return res.status(400).json({
-            success: false,
-            error: 'Username and password are required'
-        });
+        return res.status(400).json({ success: false, error: 'Username and password required' });
     }
     
-    const result = login(username, password);
-    
-    if (result.success) {
-        console.log(`✅ User logged in: ${username}`);
-        res.json(result);
-    } else {
-        console.log(`❌ Login failed: ${result.error}`);
-        res.status(401).json(result);
-    }
-});
-
-/**
- * 获取当前用户信息
- */
-app.get('/api/auth/me', authMiddleware, (req, res) => {
-    res.json({
-        success: true,
-        user: req.user
-    });
-});
-
-/**
- * 验证 Token（公开接口，用于前端检查登录状态）
- */
-app.post('/api/auth/verify', (req, res) => {
-    const { token } = req.body;
-    
-    if (!token) {
-        return res.status(400).json({
-            success: false,
-            error: 'Token is required'
-        });
-    }
-    
-    const decoded = verifyToken(token);
-    
-    if (decoded) {
-        res.json({
-            success: true,
-            user: decoded
-        });
-    } else {
-        res.status(401).json({
-            success: false,
-            error: 'Invalid or expired token'
-        });
-    }
-});
-
-
-// ==================== ⭐ 获取前端配置（新接口） ====================
-
-app.get('/api/config', (req, res) => {
-    // 返回前端需要的配置信息
-    res.json({
-        success: true,
-        config: {
-            appId: process.env.VOLC_APP_ID,
-            // 可以添加其他前端需要的配置
-            aiMode: AI_MODE,
-            features: {
-                enableVideo: true,
-                enableASR: true,
-                enableTTS: true
-            }
-        }
-    });
-});
-
-// ==================== ⭐ 获取 RTC Token（新接口） ====================
-
-app.get('/api/token', (req, res) => {
     try {
-        const { roomId, uid, wildcard } = req.query;
-        
-        if (!uid) {
-            return res.status(400).json({ 
-                error: 'uid is required',
-                success: false
-            });
-        }
-        
-        // 通配 Token 或普通 Token
-        let token;
-        let targetRoomId = roomId || '*';
-        
-        if (wildcard === 'true') {
-            // 生成通配 Token（可以加入任意房间）
-            token = generateWildcardToken(
-                process.env.VOLC_APP_ID,
-                process.env.VOLC_APP_KEY,
-                uid,
-                86400 // 24 小时
-            );
-            console.log('🔑 Generated wildcard token for:', uid);
-        } else {
-            // 生成普通 Token（只能加入指定房间）
-            if (!roomId) {
-                return res.status(400).json({
-                    error: 'roomId is required (or use wildcard=true)',
-                    success: false
-                });
-            }
-            token = generateToken(
-                process.env.VOLC_APP_ID,
-                process.env.VOLC_APP_KEY,
-                roomId,
-                uid,
-                86400 // 24 小时
-            );
-            console.log('🔑 Generated token for:', { roomId, uid });
-        }
+        const user = login(username, password);
+        const token = generateToken(user.username);
         
         res.json({
             success: true,
-            roomId: targetRoomId,
-            uid,
             token,
-            appId: process.env.VOLC_APP_ID,
-            expireIn: 86400, // 24 小时
-            wildcard: wildcard === 'true'
+            user: { username: user.username, parentEmail: user.parentEmail }
         });
     } catch (error) {
-        console.error('❌ Generate token error:', error);
-        res.status(500).json({ 
-            error: error.message,
-            success: false
-        });
-    }
-});
-
-// ==================== ⭐ AI 加入房间（需要登录） ====================
-
-app.post('/api/join-ai', optionalAuth, async (req, res) => {
-    try {
-        const { roomId, character, targetUserId, scene } = req.body;
-        
-        // 记录用户信息（如果已登录）
-        const userId = req.user ? req.user.username : 'anonymous';
-        
-        // 默认场景为 zoo
-        const sceneId = scene || 'zoo';
-        
-        console.log('\n🤖 AI joining room:', { roomId, character, targetUserId, scene: sceneId });
-        
-        if (!roomId || !character) {
-            return res.status(400).json({ 
-                error: 'roomId and character are required',
-                success: false
-            });
-        }
-        
-        // 组合角色和场景提示词
-        const combinedConfig = combineCharacterAndScenePrompt(CHARACTER_CONFIGS[character], sceneId);
-        const sceneConfig = getScenePrompt(sceneId);
-        
-        // 生成任务 ID（确保唯一性）
-        const taskId = `task_${roomId}_${Date.now()}`;
-        
-        let result;
-        
-        if (AI_MODE === 'component') {
-            // ========== 分组件模式 ==========
-            console.log(`🔧 [分组件模式] AI joining room: ${roomId}, Scene: ${sceneId}`);
-            
-            const config = getComponentConfig({
-                asrAppId: process.env.VOLC_ASR_APP_ID,
-                asrToken: process.env.VOLC_ASR_TOKEN,
-                llmEndpointId: process.env.VOLC_LLM_ENDPOINT_ID,
-                ttsAppId: process.env.VOLC_TTS_APP_ID,
-                ttsToken: process.env.VOLC_TTS_TOKEN,
-                ttsVoiceType: combinedConfig.ttsVoiceType,
-                systemPrompt: combinedConfig.systemPrompt,
-                asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
-                ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
-            });
-            
-            result = await client.startVoiceChatComponent({
-                appId: process.env.VOLC_APP_ID,
-                roomId,
-                taskId,
-                targetUserId,
-                asrConfig: config.ASRConfig,
-                llmConfig: config.LLMConfig,
-                ttsConfig: config.TTSConfig,
-                welcomeMessage: sceneConfig.welcomeMessage,
-                idleTimeout: 180
-            });
-            
-        } else if (AI_MODE === 'custom') {
-            // ========== 第三方 CustomLLM 模式 (pi-ai) ==========
-            console.log(`🤖 [CustomLLM 模式] AI joining room: ${roomId}, Scene: ${sceneId}`);
-            
-            const config = getCustomLLMConfig({
-                customLlmUrl: process.env.PI_AGENT_URL || 'http://localhost:3001/v1/chat/completions',
-                customLlmApiKey: process.env.PI_AGENT_API_KEY || 'pi-agent-secret-key',
-                customLlmModel: process.env.PI_AGENT_MODEL || 'pi-agent-v1',
-                systemPrompt: combinedConfig.systemPrompt || 'You are a friendly English teacher for kids.',
-                temperature: parseFloat(process.env.PI_AGENT_TEMPERATURE || '0.7'),
-                maxTokens: parseInt(process.env.PI_AGENT_MAX_TOKENS || '500'),
-                topP: parseFloat(process.env.PI_AGENT_TOP_P || '0.9'),
-                historyLength: parseInt(process.env.PI_AGENT_HISTORY_LENGTH || '3'),
-                // ASR 和 TTS 仍然使用火山引擎
-                asrAppId: process.env.VOLC_ASR_APP_ID,
-                asrToken: process.env.VOLC_ASR_TOKEN,
-                ttsAppId: process.env.VOLC_TTS_APP_ID,
-                ttsToken: process.env.VOLC_TTS_TOKEN,
-                ttsVoiceType: combinedConfig.ttsVoiceType,
-                asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
-                ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
-            });
-            
-            result = await client.startVoiceChatComponent({
-                appId: process.env.VOLC_APP_ID,
-                roomId,
-                taskId,
-                targetUserId,
-                asrConfig: config.ASRConfig,
-                llmConfig: config.LLMConfig,
-                ttsConfig: config.TTSConfig,
-                welcomeMessage: sceneConfig.welcomeMessage,
-                idleTimeout: 180
-            });
-            
-        } else {
-            // ========== 端到端模式 ==========
-            console.log(`🎯 [端到端模式] AI joining room: ${roomId}, Scene: ${sceneId}`);
-            
-            const config = getS2SConfig({
-                s2sAppId: process.env.VOLC_S2S_APP_ID,
-                s2sToken: process.env.VOLC_S2S_TOKEN,
-                modelVersion: process.env.VOLC_S2S_MODEL_VERSION || 'O',
-                systemRole: combinedConfig.systemRole,
-                speakingStyle: combinedConfig.speakingStyle,
-                speaker: combinedConfig.s2sSpeaker,
-                outputMode: parseInt(process.env.VOLC_S2S_OUTPUT_MODE || '0')
-            });
-            
-            result = await client.startVoiceChatS2S({
-                appId: process.env.VOLC_APP_ID,
-                roomId,
-                taskId,
-                targetUserId,
-                s2sConfig: config,
-                welcomeMessage: sceneConfig.welcomeMessage,
-                idleTimeout: 180
-            });
-        }
-        
-        // 保存会话
-        sessions.set(roomId, {
-            character,
-            taskId,
-            targetUserId,
-            aiMode: AI_MODE,
-            userId,
-            scene: sceneId,
-            createdAt: Date.now()
-        });
-        
-        console.log(`✅ AI joined room: ${roomId}, TaskId: ${taskId}`);
-        
-        res.json({
-            roomId,
-            taskId,
-            character,
-            characterName: CHARACTER_CONFIGS[character].name,
-            scene: sceneId,
-            aiMode: AI_MODE,
-            success: true,
-            message: 'AI character joined room successfully'
-        });
-        
-    } catch (error) {
-        console.error('❌ Join AI error:', error);
-        res.status(500).json({ 
-            error: error.message,
-            success: false
-        });
-    }
-});
-
-// ==================== 离开房间 ====================
-
-app.post('/api/leave-room', async (req, res) => {
-    try {
-        const { roomId, taskId } = req.body;
-        
-        console.log('\n👋 Leaving room:', { roomId, taskId });
-        
-        const session = sessions.get(roomId);
-        if (session && session.taskId) {
-            await client.stopVoiceChat({
-                appId: process.env.VOLC_APP_ID,
-                roomId,
-                taskId: session.taskId
-            });
-            sessions.delete(roomId);
-            console.log(`✅ Room closed: ${roomId}`);
-        }
-        
-        res.json({ success: true });
-    } catch (error) {
-        console.error('❌ Leave room error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(401).json({ success: false, error: error.message });
     }
 });
 
@@ -791,7 +328,7 @@ app.get('/api/characters', (req, res) => {
     res.json({ characters });
 });
 
-// ==================== 获取 Token（可选） ====================
+// ==================== 获取 Token ====================
 
 app.get('/api/token', (req, res) => {
     try {
@@ -810,154 +347,191 @@ app.get('/api/token', (req, res) => {
             appId: process.env.VOLC_APP_ID
         });
     } catch (error) {
+        console.error('Token generation error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// ==================== SPA 路由 ====================
+// ==================== AI 加入房间 ====================
 
-app.get('*', (req, res) => {
+app.post('/api/join-ai', authMiddleware, async (req, res) => {
+    const { roomId, character, sceneId } = req.body;
+    const userId = req.user.username;
+    
+    if (!roomId || !character || !sceneId) {
+        return res.status(400).json({ error: 'roomId, character, and sceneId required' });
+    }
+    
+    const targetUserId = `ai_${character}_${roomId}`;
+    
+    const combinedConfig = combineCharacterAndScenePrompt(CHARACTER_CONFIGS[character], sceneId);
+    const sceneConfig = getScenePrompt(sceneId);
+    const taskId = `task_${roomId}_${Date.now()}`;
+    
+    let result;
+    
+    if (AI_MODE === 'component') {
+        const config = getComponentConfig({
+            asrAppId: process.env.VOLC_ASR_APP_ID,
+            asrToken: process.env.VOLC_ASR_TOKEN,
+            llmEndpointId: process.env.VOLC_LLM_ENDPOINT_ID,
+            ttsAppId: process.env.VOLC_TTS_APP_ID,
+            ttsToken: process.env.VOLC_TTS_TOKEN,
+            ttsVoiceType: combinedConfig.ttsVoiceType,
+            systemPrompt: combinedConfig.systemPrompt,
+            asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
+            ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
+        });
+        
+        result = await client.startVoiceChatComponent({
+            appId: process.env.VOLC_APP_ID,
+            roomId,
+            taskId,
+            targetUserId,
+            asrConfig: config.ASRConfig,
+            llmConfig: config.LLMConfig,
+            ttsConfig: config.TTSConfig,
+            welcomeMessage: sceneConfig.welcomeMessage,
+            idleTimeout: 180
+        });
+    } else if (AI_MODE === 'custom') {
+        const config = getCustomLLMConfig({
+            customLlmUrl: process.env.PI_AGENT_URL || `http://localhost:${PORT}/v1/chat/completions`,
+            customLlmApiKey: process.env.PI_AGENT_API_KEY || 'pi-agent-secret-key',
+            customLlmModel: process.env.PI_AGENT_MODEL || LLM_MODEL,
+            systemPrompt: combinedConfig.systemPrompt,
+            temperature: parseFloat(process.env.PI_AGENT_TEMPERATURE || '0.7'),
+            maxTokens: parseInt(process.env.PI_AGENT_MAX_TOKENS || '500'),
+            topP: parseFloat(process.env.PI_AGENT_TOP_P || '0.9'),
+            historyLength: parseInt(process.env.PI_AGENT_HISTORY_LENGTH || '3'),
+            asrAppId: process.env.VOLC_ASR_APP_ID,
+            asrToken: process.env.VOLC_ASR_TOKEN,
+            ttsAppId: process.env.VOLC_TTS_APP_ID,
+            ttsToken: process.env.VOLC_TTS_TOKEN,
+            ttsVoiceType: combinedConfig.ttsVoiceType,
+            asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
+            ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
+        });
+        
+        result = await client.startVoiceChatComponent({
+            appId: process.env.VOLC_APP_ID,
+            roomId,
+            taskId,
+            targetUserId,
+            asrConfig: config.ASRConfig,
+            llmConfig: config.LLMConfig,
+            ttsConfig: config.TTSConfig,
+            welcomeMessage: sceneConfig.welcomeMessage,
+            idleTimeout: 180
+        });
+    } else {
+        const config = getS2SConfig({
+            s2sAppId: process.env.VOLC_S2S_APP_ID,
+            s2sToken: process.env.VOLC_S2S_TOKEN,
+            modelVersion: process.env.VOLC_S2S_MODEL_VERSION || 'O',
+            systemRole: combinedConfig.systemRole,
+            speakingStyle: combinedConfig.speakingStyle,
+            speaker: combinedConfig.s2sSpeaker,
+            outputMode: parseInt(process.env.VOLC_S2S_OUTPUT_MODE || '0')
+        });
+        
+        result = await client.startVoiceChatS2S({
+            appId: process.env.VOLC_APP_ID,
+            roomId,
+            taskId,
+            targetUserId,
+            s2sConfig: config,
+            welcomeMessage: sceneConfig.welcomeMessage,
+            idleTimeout: 180
+        });
+    }
+    
+    sessions.set(roomId, {
+        character,
+        taskId,
+        targetUserId,
+        aiMode: AI_MODE,
+        userId,
+        scene: sceneId,
+        createdAt: Date.now()
+    });
+    
+    console.log(`✅ AI joined room: ${roomId}, TaskId: ${taskId}`);
+    
+    res.json({
+        roomId,
+        taskId,
+        character,
+        characterName: CHARACTER_CONFIGS[character].name,
+        targetUserId,
+        aiMode: AI_MODE,
+        success: true
+    });
+});
+
+// ==================== 离开房间 ====================
+
+app.post('/api/leave-room', authMiddleware, async (req, res) => {
+    const { roomId, taskId } = req.body;
+    
+    if (!roomId || !taskId) {
+        return res.status(400).json({ error: 'roomId and taskId required' });
+    }
+    
+    try {
+        await client.stopVoiceChat({
+            appId: process.env.VOLC_APP_ID,
+            roomId,
+            taskId
+        });
+        
+        sessions.delete(roomId);
+        console.log(`✅ AI left room: ${roomId}`);
+        
+        res.json({ success: true, message: 'AI left room successfully' });
+    } catch (error) {
+        console.error('Leave room error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== 根路径 ====================
+
+app.get('/', (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-// ==================== 启动服务 ====================
+// ==================== 启动服务器 ====================
 
-// 创建 HTTP 重定向服务器（HTTPS 模式下）
-let httpServer;
-let httpsServer;
-
-if (USE_HTTPS) {
-    // 读取 SSL 证书
-    let sslOptions;
-    try {
-        sslOptions = {
-            key: fs.readFileSync(SSL_KEY_PATH),
-            cert: fs.readFileSync(SSL_CERT_PATH)
-        };
-        console.log('✅ SSL 证书加载成功');
-    } catch (error) {
-        console.error('❌ SSL 证书加载失败:', error.message);
-        console.log('⚠️  降级到 HTTP 模式');
-        sslOptions = null;
-    }
-    
-    if (sslOptions) {
-        // 创建 HTTPS 服务器
-        httpsServer = https.createServer(sslOptions, app);
-        
-        httpsServer.listen(HTTPS_PORT, () => {
-            console.log(`
-╔══════════════════════════════════════════════════════╗
-║   English Friend - StartVoiceChat Server             ║
-║   (Frontend Creates Room Flow) - HTTPS Mode          ║
-║                                                      ║
-║   🔒 Protocol:  HTTPS                                ║
-║   🌐 Frontend:  https://localhost:${HTTPS_PORT}${' '.repeat(33 - String(HTTPS_PORT).length)}║
-║   📡 API:       https://localhost:${HTTPS_PORT}/api${' '.repeat(29 - String(HTTPS_PORT).length)}║
-║   🔑 Health:    https://localhost:${HTTPS_PORT}/health${' '.repeat(28 - String(HTTPS_PORT).length)}║
-║                                                      ║
-║   🤖 AI Mode:   ${AI_MODE === 'component' ? '分组件 (ASR+LLM+TTS)' : '端到端 (S2S)'}${' '.repeat(23 - (AI_MODE === 'component' ? 16 : 9))}║
-║   🎮 RTC:       ${process.env.VOLC_APP_ID ? '✅ configured' : '❌ not configured'}${' '.repeat(23 - (process.env.VOLC_APP_ID ? 14 : 17))}║
-║   🔄 Flow:      Frontend → Create Room → AI Joins    ║
-║                                                      ║
-║   ✨ API Endpoints:                                   ║
-║   - POST /api/join-ai    (AI joins room)             ║
-║   - POST /api/leave-room (Leave & stop AI)           ║
-║   - GET  /api/characters (Get character list)        ║
-║   - GET  /api/token      (Get RTC token)             ║
-║                                                      ║
-║   ✨ 5 种角色：Emma, Tommy, Lily, Mike, Rose          ║
-╚══════════════════════════════════════════════════════╝
-
-🚀 HTTPS 服务已启动！
-📱 浏览器访问：https://localhost:${HTTPS_PORT}
-🔧 模式：${AI_MODE === 'component' ? '分组件' : '端到端'}
-🔄 流程：前端创建房间 → AI 加入
-🔐 SSL 证书：${SSL_CERT_PATH}
-            `);
-        });
-        
-        // 创建 HTTP 服务器用于重定向
-        httpServer = http.createServer((req, res) => {
-            res.writeHead(301, { 'Location': `https://localhost:${HTTPS_PORT}${req.url}` });
-            res.end();
-        });
-        
-        httpServer.listen(PORT, () => {
-            console.log(`🔀 HTTP 重定向：http://localhost:${PORT} → https://localhost:${HTTPS_PORT}`);
-        });
-    } else {
-        // 降级到 HTTP 模式
-        startHttpServer();
-    }
-} else {
-    // 纯 HTTP 模式
-    startHttpServer();
-}
-
-// 启动 HTTP 服务器
-function startHttpServer() {
-    const server = app.listen(PORT, () => {
-        console.log(`
-╔══════════════════════════════════════════════════════╗
-║   English Friend - StartVoiceChat Server             ║
-║   (Frontend Creates Room Flow)                       ║
-║                                                      ║
-║   🔒 Protocol:  HTTP (Insecure)                      ║
-║   🌐 Frontend:  http://localhost:${PORT}${' '.repeat(34 - String(PORT).length)}║
-║   📡 API:       http://localhost:${PORT}/api${' '.repeat(30 - String(PORT).length)}║
-║   🔑 Health:    http://localhost:${PORT}/health${' '.repeat(29 - String(PORT).length)}║
-║                                                      ║
-║   🤖 AI Mode:   ${AI_MODE === 'component' ? '分组件 (ASR+LLM+TTS)' : '端到端 (S2S)'}${' '.repeat(23 - (AI_MODE === 'component' ? 16 : 9))}║
-║   🎮 RTC:       ${process.env.VOLC_APP_ID ? '✅ configured' : '❌ not configured'}${' '.repeat(23 - (process.env.VOLC_APP_ID ? 14 : 17))}║
-║   🔄 Flow:      Frontend → Create Room → AI Joins    ║
-║                                                      ║
-║   ✨ API Endpoints:                                   ║
-║   - POST /api/join-ai    (AI joins room)             ║
-║   - POST /api/leave-room (Leave & stop AI)           ║
-║   - GET  /api/characters (Get character list)        ║
-║   - GET  /api/token      (Get RTC token)             ║
-║                                                      ║
-║   ✨ 5 种角色：Emma, Tommy, Lily, Mike, Rose          ║
-╚══════════════════════════════════════════════════════╝
-
-🚀 服务已启动！
-📱 浏览器访问：http://localhost:${PORT}
-🔧 模式：${AI_MODE === 'component' ? '分组件' : '端到端'}
-🔄 流程：前端创建房间 → AI 加入
-        `);
-    });
-    
-    // 优雅关闭
-    process.on('SIGTERM', () => gracefulShutdown(server));
-    process.on('SIGINT', () => gracefulShutdown(server));
-}
-
-// 优雅关闭函数
-function gracefulShutdown(server) {
-    console.log('\n👋 正在关闭服务...');
-    
-    // 关闭所有活跃会话
-    for (const [roomId, session] of sessions) {
+function startServer() {
+    if (USE_HTTPS) {
         try {
-            client.stopVoiceChat({
-                appId: process.env.VOLC_APP_ID,
-                roomId,
-                taskId: session.taskId
+            const httpsOptions = {
+                key: fs.readFileSync(SSL_KEY_PATH),
+                cert: fs.readFileSync(SSL_CERT_PATH)
+            };
+            
+            https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
+                console.log(`✅ HTTPS server running on https://localhost:${HTTPS_PORT}`);
             });
-        } catch (e) {
-            console.error(`❌ 关闭房间 ${roomId} 失败：`, e.message);
+        } catch (error) {
+            console.error('❌ HTTPS setup failed:', error.message);
+            console.log('📌 Starting with HTTP instead...');
+            startHTTP();
         }
+    } else {
+        startHTTP();
     }
-    
-    server.close(() => {
-        // 如果启用了 HTTPS，也关闭 HTTP 服务器
-        if (httpServer) {
-            httpServer.close();
+}
+
+function startHTTP() {
+    app.listen(PORT, () => {
+        console.log(`✅ HTTP server running on http://localhost:${PORT}`);
+        console.log(`📱 Access: http://localhost:${PORT}`);
+        if (USE_HTTPS) {
+            console.log(`🔒 HTTPS: https://localhost:${HTTPS_PORT}`);
         }
-        console.log('✅ 服务已关闭');
-        process.exit(0);
     });
 }
 
-
+startServer();
