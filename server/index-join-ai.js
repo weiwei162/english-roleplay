@@ -159,7 +159,7 @@ app.get('/health', (req, res) => {
             authEnabled: true
         },
         activeSessions: sessions.size,
-        piAgentSessions: piSessions.size,
+        piAgentSessions: piAgents.size,
         flow: 'frontend-creates-room'
     });
 });
