@@ -3,9 +3,10 @@
  * 火山引擎 StartVoiceChat API 客户端
  * 文档：https://www.volcengine.com/docs/6348/1558163
  * 
- * 支持两种配置模式：
+ * 支持三种配置模式：
  * 1. 分组件模式：ASR + LLM + TTS 分别配置
  * 2. 端到端模式：S2SConfig（豆包端到端实时语音大模型）
+ * 3. 第三方 LLM 模式：CustomLLM（如 pi-agent-core）
  */
 
 const crypto = require('crypto');
@@ -377,6 +378,84 @@ function getS2SConfig(options = {}) {
     };
 }
 
+/**
+ * 获取第三方 CustomLLM 模式配置
+ * 用于接入 pi-agent-core 或其他第三方 Agent
+ */
+function getCustomLLMConfig(options = {}) {
+    const {
+        customLlmUrl = 'http://localhost:3001/v1/chat/completions',
+        customLlmApiKey = 'pi-agent-secret-key',
+        customLlmModel = 'pi-agent-v1',
+        systemPrompt = 'You are a friendly English teacher for kids.',
+        temperature = 0.7,
+        maxTokens = 500,
+        topP = 0.9,
+        historyLength = 3
+    } = options;
+    
+    return {
+        // ASR 配置 - 火山流式语音识别大模型
+        ASRConfig: {
+            Provider: 'volcano',
+            ProviderParams: {
+                Mode: 'bigmodel',
+                Credential: {
+                    AppId: options.asrAppId,
+                    AccessToken: options.asrToken,
+                    ApiResourceId: options.asrResourceId || 'volc.bigasr.sauc.duration'
+                },
+                StreamMode: 2,
+                ContextHistoryLength: historyLength
+            },
+            VADConfig: {
+                SilenceTime: 600,
+                AIVAD: true
+            }
+        },
+        
+        // LLM 配置 - 第三方 CustomLLM
+        LLMConfig: {
+            Mode: 'CustomLLM', // 固定值
+            Url: customLlmUrl, // 第三方服务地址
+            APIKey: customLlmApiKey, // 鉴权 Token
+            ModelName: customLlmModel, // 模型名称
+            Temperature: temperature,
+            MaxTokens: maxTokens,
+            TopP: topP,
+            SystemMessages: [systemPrompt],
+            HistoryLength: historyLength,
+            Prefill: false // 是否开启预填充（降低延迟但增加调用次数）
+        },
+        
+        // TTS 配置 - 火山语音合成大模型
+        TTSConfig: {
+            Provider: 'volcano_bidirection',
+            ProviderParams: {
+                ResourceId: options.ttsResourceId || 'volc.service_type.10029',
+                app: {
+                    appid: options.ttsAppId,
+                    token: options.ttsToken
+                },
+                audio: {
+                    voice_type: options.ttsVoiceType || 'zh_female_linjianvhai_moon_bigtts',
+                    speech_rate: 0
+                },
+                Additions: {
+                    disable_markdown_filter: true,
+                    enable_language_detector: false
+                }
+            }
+        },
+        
+        // 字幕配置 - 开启客户端字幕回调
+        SubtitleConfig: {
+            DisableRTSSubtitle: false,
+            SubtitleMode: 1
+        }
+    };
+}
+
 // ============== 角色人设 ==============
 
 const CHARACTER_CONFIGS = {
@@ -477,6 +556,7 @@ module.exports = {
     VolcStartVoiceChatClient,
     getComponentConfig,
     getS2SConfig,
+    getCustomLLMConfig, // 第三方 CustomLLM 模式
     CHARACTER_CONFIGS,
     test
 };

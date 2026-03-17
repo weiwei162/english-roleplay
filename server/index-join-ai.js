@@ -15,7 +15,7 @@ const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
-const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, CHARACTER_CONFIGS } = require('./volc-start-voicechat');
+const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLMConfig, CHARACTER_CONFIGS } = require('./volc-start-voicechat');
 const { combineCharacterAndScenePrompt, getScenePrompt } = require('./prompts');
 const { generateToken, generateWildcardToken, verifyToken } = require('./token-generator');
 const { register, login, authMiddleware, optionalAuth } = require('./auth');
@@ -27,7 +27,7 @@ app.use(express.json());
 
 // ==================== 配置 ====================
 
-const AI_MODE = process.env.AI_MODE || 's2s'; // 'component' 或 's2s'
+const AI_MODE = process.env.AI_MODE || 's2s'; // 'component', 's2s', 或 'custom' (pi-agent-core)
 const PORT = parseInt(process.env.PORT) || 3000;
 
 // HTTPS 配置
@@ -51,7 +51,7 @@ const sessions = new Map();
 // ==================== 静态文件 ====================
 
 console.log('📁 Serving frontend from:', frontendPath);
-console.log(`🤖 AI Mode: ${AI_MODE === 'component' ? '分组件模式' : '端到端模式 (S2S)'}`);
+console.log(`🤖 AI Mode: ${AI_MODE === 'component' ? '分组件模式' : AI_MODE === 'custom' ? '第三方 LLM (pi-agent-core)' : '端到端模式 (S2S)'}`);
 console.log('🔄 Flow: Frontend creates room → AI joins via backend');
 
 app.use(express.static(frontendPath, {
@@ -303,6 +303,41 @@ app.post('/api/join-ai', optionalAuth, async (req, res) => {
                 ttsToken: process.env.VOLC_TTS_TOKEN,
                 ttsVoiceType: combinedConfig.ttsVoiceType,
                 systemPrompt: combinedConfig.systemPrompt,
+                asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
+                ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
+            });
+            
+            result = await client.startVoiceChatComponent({
+                appId: process.env.VOLC_APP_ID,
+                roomId,
+                taskId,
+                targetUserId,
+                asrConfig: config.ASRConfig,
+                llmConfig: config.LLMConfig,
+                ttsConfig: config.TTSConfig,
+                welcomeMessage: sceneConfig.welcomeMessage,
+                idleTimeout: 180
+            });
+            
+        } else if (AI_MODE === 'custom') {
+            // ========== 第三方 CustomLLM 模式 (pi-agent-core) ==========
+            console.log(`🤖 [CustomLLM 模式] AI joining room: ${roomId}, Scene: ${sceneId}`);
+            
+            const config = getCustomLLMConfig({
+                customLlmUrl: process.env.PI_AGENT_URL || 'http://localhost:3001/v1/chat/completions',
+                customLlmApiKey: process.env.PI_AGENT_API_KEY || 'pi-agent-secret-key',
+                customLlmModel: process.env.PI_AGENT_MODEL || 'pi-agent-v1',
+                systemPrompt: combinedConfig.systemPrompt || 'You are a friendly English teacher for kids.',
+                temperature: parseFloat(process.env.PI_AGENT_TEMPERATURE || '0.7'),
+                maxTokens: parseInt(process.env.PI_AGENT_MAX_TOKENS || '500'),
+                topP: parseFloat(process.env.PI_AGENT_TOP_P || '0.9'),
+                historyLength: parseInt(process.env.PI_AGENT_HISTORY_LENGTH || '3'),
+                // ASR 和 TTS 仍然使用火山引擎
+                asrAppId: process.env.VOLC_ASR_APP_ID,
+                asrToken: process.env.VOLC_ASR_TOKEN,
+                ttsAppId: process.env.VOLC_TTS_APP_ID,
+                ttsToken: process.env.VOLC_TTS_TOKEN,
+                ttsVoiceType: combinedConfig.ttsVoiceType,
                 asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
                 ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
             });
