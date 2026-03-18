@@ -313,8 +313,8 @@ app.post('/api/auth/register', (req, res) => {
     }
     
     try {
-        register(username, password, parentEmail);
-        res.json({ success: true, message: 'Registration successful' });
+        const result = register(username, password, parentEmail);
+        res.json(result);  // register 返回 { success, token, user }
     } catch (error) {
         res.status(400).json({ success: false, error: error.message });
     }

@@ -143,6 +143,7 @@ function speak(text, callback) {
  * 切换屏幕
  * 注意：离开画布界面时需要离开 AI 房间
  */
+// 导出到全局
 async function showScreen(screenId) {
     console.log('📺 Switching to screen:', screenId);
     
@@ -1159,5 +1160,8 @@ window.stopAudioLevelMonitor = stopAudioLevelMonitor;
 window.showAudioControlBar = showAudioControlBar;
 window.hideAudioControlBar = hideAudioControlBar;
 window.updateRTCStatus = updateRTCStatus;
+window.showScreen = showScreen;
+window.updateAuthUI = updateAuthUI;
+window.checkAuthAndShowScreen = checkAuthAndShowScreen;
 
 console.log('🔧 Enhanced app module loaded with WebSocket support');

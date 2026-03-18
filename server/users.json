@@ -1,0 +1,20 @@
+{
+  "testuser": {
+    "id": "user_1773856310553",
+    "username": "testuser",
+    "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "parentEmail": "",
+    "createdAt": "2026-03-18T17:51:50.553Z",
+    "lastLogin": "2026-03-18T17:51:50.568Z",
+    "totalSessions": 1
+  },
+  "testuser2": {
+    "id": "user_1773856460704",
+    "username": "testuser2",
+    "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "parentEmail": "",
+    "createdAt": "2026-03-18T17:54:20.704Z",
+    "lastLogin": null,
+    "totalSessions": 0
+  }
+}
