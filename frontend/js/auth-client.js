@@ -265,6 +265,14 @@ function updateAuthUI() {
     }
 }
 
+// 导出全局函数
+window.handleLogin = handleLogin;
+window.handleRegister = handleRegister;
+window.handleLogout = handleLogout;
+window.showLoginScreen = showLoginScreen;
+window.toggleAuthForm = toggleAuthForm;
+window.updateAuthUI = updateAuthUI;
+
 // 页面加载时更新 UI
 document.addEventListener('DOMContentLoaded', function() {
     updateAuthUI();
