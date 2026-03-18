@@ -63,6 +63,27 @@ const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
 const LLM_API_KEY = process.env.LLM_API_KEY;
 const LLM_BASE_URL = process.env.LLM_BASE_URL;
 
+// 获取模型（支持内置提供商和自定义 OpenAI compatible 服务）
+function getLLMModel() {
+    // 如果有自定义 BASE_URL，使用 openai-completions 兼容模式
+    if (LLM_BASE_URL) {
+        return {
+            id: LLM_MODEL,
+            name: LLM_MODEL,
+            api: 'openai-completions',
+            provider: 'custom',
+            baseUrl: LLM_BASE_URL,
+            reasoning: false,
+            input: ['text', 'image'],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 128000,
+            maxTokens: 16384
+        };
+    }
+    // 使用内置提供商
+    return getModel(LLM_PROVIDER, LLM_MODEL);
+}
+
 const TEACHER_SYSTEM_PROMPT = `You are a friendly and encouraging English teacher for kids aged 6-10.
 
 Your role:
@@ -126,7 +147,7 @@ function getOrCreateAgent(sessionId) {
         const agent = new Agent({
             initialState: {
                 systemPrompt: TEACHER_SYSTEM_PROMPT,
-                model: getModel(LLM_PROVIDER, LLM_MODEL),
+                model: getLLMModel(),
                 thinkingLevel: 'off',
                 tools: TOOLS,
                 messages: []
