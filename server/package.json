@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@volcengine/rtc": "^4.68.1",
-    "@mariozechner/pi-ai": "0.58.4",
-    "@mariozechner/pi-agent-core": "0.58.4",
+    "@mariozechner/pi-ai": "0.60.0",
+    "@mariozechner/pi-agent-core": "0.60.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
