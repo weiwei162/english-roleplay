@@ -8,12 +8,11 @@
  *   Character.playAnimation('thumbsup', 2000, () => console.log('动画完成'));
  */
 
-const Character = (function() {
-    // 动画队列
-    let animationQueue = [];
-    let isPlaying = false;
-    let currentAnimation = null;
-    let currentTimeout = null;
+// 动画队列
+let animationQueue = [];
+let isPlaying = false;
+let currentAnimation = null;
+let currentTimeout = null;
 
     // 默认动画时长
     const DEFAULT_DURATION = 1000;
@@ -279,18 +278,15 @@ const Character = (function() {
         }));
     }
 
-    return {
-        playAnimation,
-        playSequence,
-        playRandom,
-        stopAnimation,
-        getStatus,
-        getAnimations,
-        ANIMATIONS
-    };
-})();
-
-// 导出到全局
-window.Character = Character;
+// 导出公共 API
+export {
+    playAnimation,
+    playSequence,
+    playRandom,
+    stopAnimation,
+    getStatus,
+    getAnimations,
+    ANIMATIONS
+};
 
 console.log('🎭 Character animations module loaded');

@@ -7,12 +7,11 @@
  *   Particles.spawn('hearts', { x: 100, y: 200 });
  */
 
-const Particles = (function() {
-    // 粒子实例数组
-    let particles = [];
-    let animationId = null;
-    let canvas = null;
-    let ctx = null;
+// 粒子实例数组
+let particles = [];
+let animationId = null;
+let canvas = null;
+let ctx = null;
 
     // 粒子类型配置
     const PARTICLE_TYPES = {
@@ -365,18 +364,14 @@ const Particles = (function() {
         return particles.length;
     }
 
-    // 导出公共 API
-    return {
-        spawn,
-        stop,
-        destroy,
-        getTypes,
-        getCount,
-        PARTICLE_TYPES
-    };
-})();
-
-// 导出到全局
-window.Particles = Particles;
+// 导出公共 API
+export {
+    spawn,
+    stop,
+    destroy,
+    getTypes,
+    getCount,
+    PARTICLE_TYPES
+};
 
 console.log('✨ Particles module loaded');
