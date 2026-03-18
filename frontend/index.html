@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>English Friend - 英语好朋友</title>
-    <link rel="stylesheet" href="css/style.css">
     <!-- 火山云 RTC SDK - 官方 CDN -->
     <!-- 参考文档：https://www.volcengine.com/docs/6348/75707 -->
     <!-- 注意：使用静态加载，避免动态加载的时序问题 -->
@@ -200,18 +199,7 @@
         </div>
     </div>
 
-    <!-- 🔐 认证模块 -->
-    <script src="js/auth-client.js"></script>
-    
-    <!-- 核心模块 -->
-    <script src="js/characters.js"></script>
-    <script src="js/scenes.js"></script>
-    <script src="js/conversations.js"></script>
-    
-    <!-- ⭐ StartVoiceChat 客户端 -->
-    <script src="js/startvoicechat-client.js"></script>
-    
-    <!-- 主应用 -->
-    <script src="js/app.js"></script>
+    <!-- Vite 入口 -->
+    <script type="module" src="/main.js"></script>
 </body>
 </html>

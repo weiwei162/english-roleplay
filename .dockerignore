@@ -35,7 +35,6 @@ Thumbs.db
 coverage
 .nyc_output
 dist
-build
 *.tgz
 
 # 运行时
@@ -47,3 +46,7 @@ ssl
 
 # 用户数据
 user.json
+
+# 前端开发文件（Docker 构建不需要）
+frontend/node_modules
+frontend/dist

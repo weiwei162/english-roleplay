@@ -37,7 +37,7 @@ const HTTPS_PORT = parseInt(process.env.HTTPS_PORT) || 3443;
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH || './ssl/cert.pem';
 const SSL_KEY_PATH = process.env.SSL_KEY_PATH || './ssl/key.pem';
 
-const frontendPath = path.join(__dirname, '..');
+const frontendPath = path.join(__dirname, '..', 'frontend');
 
 // 初始化客户端
 const client = new VolcStartVoiceChatClient({
