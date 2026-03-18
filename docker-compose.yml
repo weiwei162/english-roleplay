@@ -7,7 +7,6 @@ services:
   english-roleplay:
     build:
       context: .
-      dockerfile: server/Dockerfile.main
     container_name: english-roleplay
     restart: unless-stopped
     ports:
