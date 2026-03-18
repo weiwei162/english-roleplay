@@ -169,6 +169,23 @@ app.use(express.static(frontendPath, {
     etag: true
 }));
 
+// ==================== 配置接口 ====================
+
+app.get('/api/config', (req, res) => {
+    res.json({
+        success: true,
+        config: {
+            appId: process.env.VOLC_APP_ID || '',
+            aiMode: AI_MODE,
+            llmProvider: AI_MODE === 'custom' ? LLM_PROVIDER : 'N/A',
+            llmModel: AI_MODE === 'custom' ? LLM_MODEL : 'N/A',
+            volcConfigured: !!(process.env.VOLC_APP_ID && process.env.VOLC_APP_KEY),
+            rtcConfigured: !!(process.env.VOLC_APP_ID && process.env.VOLC_APP_KEY),
+            authEnabled: true
+        }
+    });
+});
+
 // ==================== 健康检查 ====================
 
 app.get('/health', (req, res) => {
