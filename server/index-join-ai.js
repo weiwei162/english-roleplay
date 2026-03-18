@@ -396,20 +396,22 @@ app.get('/api/token', (req, res) => {
         const { roomId, uid } = req.query;
         
         if (!roomId || !uid) {
-            return res.status(400).json({ error: 'roomId and uid required' });
+            return res.status(400).json({ success: false, error: 'roomId and uid required' });
         }
         
         const token = client.generateToken(roomId, uid);
         
         res.json({
+            success: true,
             roomId,
             uid,
             token,
-            appId: process.env.VOLC_APP_ID
+            appId: process.env.VOLC_APP_ID,
+            expireIn: 86400  // 24 小时
         });
     } catch (error) {
         console.error('Token generation error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
