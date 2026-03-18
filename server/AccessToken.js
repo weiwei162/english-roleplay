@@ -1,4 +1,4 @@
-var crypto = require('crypto');
+import crypto from 'crypto';
 
 var randomInt = Math.floor(Math.random() * 0xFFFFFFFF);
 
@@ -7,19 +7,15 @@ const VERSION_LENGTH = 3;
 
 const APP_ID_LENGTH = 24;
 
-privileges = {
+const privileges = {
     PrivPublishStream: 0,
-
-    // not exported, do not use directly
     privPublishAudioStream: 1,
     privPublishVideoStream: 2,
     privPublishDataStream: 3,
-
     PrivSubscribeStream: 4,
 };
 
-
-module.exports.privileges = privileges;
+export { privileges };
 
 // Initializes token struct by required parameters.
 var AccessToken = function (appID, appKey, roomID, userID) {
@@ -120,9 +116,8 @@ var Parse = function (raw) {
 };
 
 
-module.exports.version = VERSION;
-module.exports.AccessToken = AccessToken;
-module.exports.Parse = Parse;
+export const version = VERSION;
+export { AccessToken, Parse };
 
 var encodeHMac = function (key, message) {
     return crypto.createHmac('sha256', key).update(message).digest();

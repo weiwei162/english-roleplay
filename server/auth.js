@@ -3,10 +3,14 @@
  * 简单的基于 JWT 的认证系统
  */
 
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const path = require('path');
-const fs = require('fs');
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 const TOKEN_EXPIRY = '30d'; // 30 天有效期
@@ -204,7 +208,7 @@ function optionalAuth(req, res, next) {
     next();
 }
 
-module.exports = {
+export {
     register,
     login,
     verifyToken,

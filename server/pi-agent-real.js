@@ -11,10 +11,10 @@
  * 文档：https://github.com/badlogic/pi-mono/tree/main/packages/ai
  */
 
-const express = require('express');
-const cors = require('cors');
-const { getModel, stream, complete, Type } = require('@mariozechner/pi-ai');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import { getModel, stream, complete, Type } from '@mariozechner/pi-ai';
+import 'dotenv/config';
 
 const app = express();
 app.use(cors());

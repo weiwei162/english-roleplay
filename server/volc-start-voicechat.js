@@ -9,9 +9,9 @@
  * 3. 第三方 LLM 模式：CustomLLM（如 pi-agent-core）
  */
 
-const crypto = require('crypto');
-const { generateToken: generateOfficialToken } = require('./token-generator-official');
-const https = require('https');
+import crypto from 'crypto';
+import { generateToken as generateOfficialToken } from './token-generator-official.js';
+import https from 'https';
 
 class VolcStartVoiceChatClient {
     constructor(options = {}) {
@@ -548,15 +548,19 @@ async function test() {
     console.log('   - stopVoiceChat() - 结束对话');
 }
 
-if (require.main === module) {
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+if (process.argv[1] === __filename) {
     test().catch(console.error);
 }
 
-module.exports = {
+export {
     VolcStartVoiceChatClient,
     getComponentConfig,
     getS2SConfig,
-    getCustomLLMConfig, // 第三方 CustomLLM 模式
+    getCustomLLMConfig,
     CHARACTER_CONFIGS,
     test
 };

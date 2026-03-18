@@ -5,7 +5,7 @@
  * 基于官方提供的 AccessToken.js 实现
  */
 
-const crypto = require('crypto');
+import crypto from 'crypto';
 
 const VERSION = "001";
 const VERSION_LENGTH = 3;
@@ -268,7 +268,13 @@ class ReadByteBuf {
 
 // ==================== CLI 使用 ====================
 
-if (require.main === module) {
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+if (process.argv[1] === __filename) {
     const args = process.argv.slice(2);
     
     if (args.length < 4) {
@@ -320,7 +326,7 @@ if (require.main === module) {
     }
 }
 
-module.exports = {
+export {
     generateToken,
     generateWildcardToken,
     verifyToken,

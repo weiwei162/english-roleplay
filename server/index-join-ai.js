@@ -10,17 +10,21 @@
  * 4. 结束时调用 /api/leave-room 结束 AI 对话
  */
 
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
-const https = require('https');
-const http = require('http');
-const { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLMConfig, CHARACTER_CONFIGS } = require('./volc-start-voicechat');
-const { combineCharacterAndScenePrompt, getScenePrompt } = require('./prompts');
-const { generateToken, generateWildcardToken, verifyToken } = require('./token-generator');
-const { register, login, authMiddleware, optionalAuth } = require('./auth');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import https from 'https';
+import http from 'http';
+import { fileURLToPath } from 'url';
+import { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLMConfig, CHARACTER_CONFIGS } from './volc-start-voicechat.js';
+import { combineCharacterAndScenePrompt, getScenePrompt } from './prompts.js';
+import { generateToken, generateWildcardToken, verifyToken } from './token-generator.js';
+import { register, login, authMiddleware, optionalAuth } from './auth.js';
+import 'dotenv/config';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
@@ -51,8 +55,8 @@ const sessions = new Map();
 
 // ==================== pi-agent-core 集成（真实 Agent） ====================
 
-const { Agent } = require('@mariozechner/pi-agent-core');
-const { getModel } = require('@mariozechner/pi-ai');
+import { Agent } from '@mariozechner/pi-agent-core';
+import { getModel } from '@mariozechner/pi-ai';
 
 const LLM_PROVIDER = process.env.LLM_PROVIDER || 'openai';
 const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';

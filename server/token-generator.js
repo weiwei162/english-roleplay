@@ -4,7 +4,7 @@
  * 基于官方 AccessToken.js 实现
  */
 
-const AccessToken = require('./AccessToken');
+import { AccessToken } from './AccessToken.js';
 
 /**
  * 生成 RTC Token
@@ -96,7 +96,11 @@ function verifyToken(tokenString, appKey) {
 
 // ==================== CLI 使用 ====================
 
-if (require.main === module) {
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+if (process.argv[1] === __filename) {
     const args = process.argv.slice(2);
     
     if (args.length < 4) {
@@ -148,9 +152,9 @@ if (require.main === module) {
     }
 }
 
-module.exports = {
+export {
     generateToken,
     generateWildcardToken,
     verifyToken,
-    privileges: AccessToken.privileges
+    AccessToken
 };

@@ -210,7 +210,7 @@ ${scenePrompt.systemPrompt}`;
     };
 }
 
-module.exports = {
+export {
     scenePrompts,
     getScenePrompt,
     getSceneVocabulary,

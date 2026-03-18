@@ -2,6 +2,7 @@
   "name": "english-friend-server",
   "version": "3.2.0",
   "description": "English Friend AI - VolcEngine StartVoiceChat Edition with PI-Agent-Core",
+  "type": "module",
   "main": "index-join-ai.js",
   "scripts": {
     "start": "node index-join-ai.js",
