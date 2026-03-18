@@ -965,3 +965,155 @@ h1 {
     width: 100%;
     margin-bottom: 10px;
 }
+
+/* ==================== 肢体动画样式 ==================== */
+
+/* 挥手动画 */
+.anim-wave {
+    animation: wave 1s ease-in-out;
+}
+@keyframes wave {
+    0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+    25% { transform: translate(-50%, -50%) rotate(15deg); }
+    50% { transform: translate(-50%, -50%) rotate(-10deg); }
+    75% { transform: translate(-50%, -50%) rotate(5deg); }
+}
+
+/* 点赞动画 */
+.anim-thumbsup {
+    animation: thumbsup 1.5s ease-in-out;
+}
+@keyframes thumbsup {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    25% { transform: translate(-50%, -50%) scale(1.2); }
+    50% { transform: translate(-50%, -50%) scale(1.1); }
+    75% { transform: translate(-50%, -50%) scale(1.15); }
+}
+
+/* 欢呼动画 */
+.anim-cheer {
+    animation: cheer 2s ease-in-out;
+}
+@keyframes cheer {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    20% { transform: translate(-50%, -50%) scale(1.1) translateY(0); }
+    40% { transform: translate(-50%, -50%) scale(1.15) translateY(-20px); }
+    60% { transform: translate(-50%, -50%) scale(1.1) translateY(0); }
+    80% { transform: translate(-50%, -50%) scale(1.05) translateY(-10px); }
+}
+
+/* 跳舞动画 */
+.anim-dance {
+    animation: dance 3s ease-in-out infinite;
+}
+@keyframes dance {
+    0%, 100% { transform: translate(-50%, -50%) rotate(0deg) translateY(0); }
+    25% { transform: translate(-50%, -50%) rotate(-10deg) translateY(-15px); }
+    50% { transform: translate(-50%, -50%) rotate(0deg) translateY(0); }
+    75% { transform: translate(-50%, -50%) rotate(10deg) translateY(-15px); }
+}
+
+/* 思考动画 */
+.anim-think {
+    animation: think 2s ease-in-out;
+}
+@keyframes think {
+    0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+    30% { transform: translate(-50%, -50%) translateX(-10px); }
+    60% { transform: translate(-50%, -50%) translateX(-5px); }
+}
+
+/* 鼓掌动画 */
+.anim-clap {
+    animation: clap 1.5s ease-in-out;
+}
+@keyframes clap {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    10% { transform: translate(-50%, -50%) scale(1.05); }
+    20% { transform: translate(-50%, -50%) scale(1); }
+    30% { transform: translate(-50%, -50%) scale(1.05); }
+    40% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.05); }
+    60% { transform: translate(-50%, -50%) scale(1); }
+    70% { transform: translate(-50%, -50%) scale(1.05); }
+    80% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 跳跃动画 */
+.anim-jump {
+    animation: jump 0.8s ease-out;
+}
+@keyframes jump {
+    0% { transform: translate(-50%, -50%) translateY(0); }
+    50% { transform: translate(-50%, -50%) translateY(-30px); }
+    100% { transform: translate(-50%, -50%) translateY(0); }
+}
+
+/* 鞠躬动画 */
+.anim-bow {
+    animation: bow 1.2s ease-in-out;
+}
+@keyframes bow {
+    0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+    50% { transform: translate(-50%, -50%) rotate(30deg); }
+}
+
+/* 比心动画 */
+.anim-heart {
+    animation: heart 2s ease-in-out;
+}
+@keyframes heart {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    25% { transform: translate(-50%, -50%) scale(1.2); }
+    50% { transform: translate(-50%, -50%) scale(1); }
+    75% { transform: translate(-50%, -50%) scale(1.1); }
+}
+
+/* 摇头动画 */
+.anim-shakehead {
+    animation: shakehead 1s ease-in-out;
+}
+@keyframes shakehead {
+    0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+    25% { transform: translate(-50%, -50%) rotate(-15deg); }
+    50% { transform: translate(-50%, -50%) rotate(15deg); }
+    75% { transform: translate(-50%, -50%) rotate(-10deg); }
+}
+
+/* 点头动画 */
+.anim-nod {
+    animation: nod 0.8s ease-in-out;
+}
+@keyframes nod {
+    0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+    50% { transform: translate(-50%, -50%) rotate(15deg); }
+}
+
+/* 伸展动画 */
+.anim-stretch {
+    animation: stretch 1.5s ease-in-out;
+}
+@keyframes stretch {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.2) translateY(-10px); }
+}
+
+/* 旋转动画 */
+.anim-spin {
+    animation: spin 1.2s ease-in-out;
+}
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* 拥抱动画 */
+.anim-hug {
+    animation: hug 2s ease-in-out;
+}
+@keyframes hug {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    30% { transform: translate(-50%, -50%) scale(1.1); }
+    50% { transform: translate(-50%, -50%) scale(1.15); }
+    70% { transform: translate(-50%, -50%) scale(1.1); }
+}
