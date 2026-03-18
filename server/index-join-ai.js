@@ -341,6 +341,26 @@ app.post('/api/auth/login', (req, res) => {
     }
 });
 
+// ==================== 验证 Token ====================
+
+app.post('/api/auth/verify', (req, res) => {
+    const { token } = req.body;
+    
+    if (!token) {
+        return res.status(400).json({ success: false, error: 'Token required' });
+    }
+    
+    try {
+        const user = verifyToken(token);
+        res.json({
+            success: true,
+            user: { username: user.username, parentEmail: user.parentEmail }
+        });
+    } catch (error) {
+        res.status(401).json({ success: false, error: 'Invalid token' });
+    }
+});
+
 // ==================== 获取角色列表 ====================
 
 app.get('/api/characters', (req, res) => {

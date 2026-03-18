@@ -202,11 +202,12 @@
     <!-- CSS -->
     <link rel="stylesheet" href="css/style.css">
     
-    <!-- JS 模块 -->
+    <!-- JS 模块 - 按依赖顺序加载 -->
     <script type="module" src="js/auth-client.js"></script>
     <script type="module" src="js/characters.js"></script>
     <script type="module" src="js/scenes.js"></script>
     <script type="module" src="js/conversations.js"></script>
+    <!-- Memory 在 conversations.js 中定义，必须在 app.js 之前加载 -->
     <script type="module" src="js/startvoicechat-client.js"></script>
     <script type="module" src="js/particles.js"></script>
     <script type="module" src="js/animations.js"></script>

@@ -306,3 +306,6 @@ function generateQuickReplies() {
     const shuffled = replies.sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 4);
 }
+
+// 导出 Memory 到全局
+window.Memory = Memory;
