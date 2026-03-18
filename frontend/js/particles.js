@@ -374,4 +374,7 @@ export {
     PARTICLE_TYPES
 };
 
+// 导出到全局
+window.Particles = { spawn, stop, destroy, getTypes, getCount, PARTICLE_TYPES };
+
 console.log('✨ Particles module loaded');

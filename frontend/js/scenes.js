@@ -315,3 +315,7 @@ function getAllScenes() {
         ...scenes[key]
     }));
 }
+
+// 导出到全局
+window.getScene = getScene;
+window.getAllScenes = getAllScenes;

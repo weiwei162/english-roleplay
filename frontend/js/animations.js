@@ -289,4 +289,7 @@ export {
     ANIMATIONS
 };
 
+// 导出到全局
+window.Character = { playAnimation, playSequence, playRandom, stopAnimation, getStatus, getAnimations, ANIMATIONS };
+
 console.log('🎭 Character animations module loaded');

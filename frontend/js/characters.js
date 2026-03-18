@@ -64,3 +64,7 @@ function getAllCharacters() {
         ...characters[key]
     }));
 }
+
+// 导出到全局
+window.getCharacter = getCharacter;
+window.getAllCharacters = getAllCharacters;
