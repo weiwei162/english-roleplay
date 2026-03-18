@@ -328,16 +328,15 @@ app.post('/api/auth/login', (req, res) => {
     }
     
     try {
-        const user = login(username, password);
-        const token = generateToken(user.username);
+        const result = login(username, password);
         
-        res.json({
-            success: true,
-            token,
-            user: { username: user.username, parentEmail: user.parentEmail }
-        });
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(401).json(result);
+        }
     } catch (error) {
-        res.status(401).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
