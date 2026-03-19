@@ -511,9 +511,16 @@ class StartVoiceChatClient {
             // 1. 调用后端结束 AI 对话
             if (this.roomId && this.taskId) {
                 console.log('🤖 [2/3] Stopping AI conversation...');
+                
+                // 获取认证 token
+                const authToken = window.authClient?.token;
+                
                 await fetch('/api/leave-room', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                    },
                     body: JSON.stringify({ 
                         roomId: this.roomId,
                         taskId: this.taskId
