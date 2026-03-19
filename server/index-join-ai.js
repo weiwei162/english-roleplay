@@ -224,6 +224,12 @@ app.post('/v1/chat/completions', async (req, res) => {
     const requestId = `pi-${Date.now()}`;
     const timestamp = Math.floor(Date.now() / 1000);
     
+    // 记录请求
+    console.log(`\n📥 [${requestId}] POST /v1/chat/completions`);
+    console.log(`   SessionId: ${req.body.session_id || 'default'}`);
+    console.log(`   Stream: ${req.body.stream || false}`);
+    console.log(`   Messages:`, JSON.stringify(req.body.messages, null, 2));
+    
     const {
         messages = [],
         stream = false,
@@ -233,9 +239,12 @@ app.post('/v1/chat/completions', async (req, res) => {
     const sessionId = session_id || `session_${Date.now()}`;
     const agent = getOrCreateAgent(sessionId);
     
+    const startTime = Date.now();
+    
     try {
         const userMessage = messages.filter(m => m.role === 'user').pop();
         if (!userMessage) {
+            console.log(`❌ [${requestId}] No user message`);
             return res.status(400).json({ error: 'No user message' });
         }
         
@@ -270,6 +279,10 @@ app.post('/v1/chat/completions', async (req, res) => {
             await agent.waitForIdle();
             unsubscribe();
             
+            const duration = Date.now() - startTime;
+            console.log(`✅ [${requestId}] Stream response in ${duration}ms`);
+            console.log(`   Assistant message length: ${assistantMessage.length} chars`);
+            
             res.write(`data: ${JSON.stringify({
                 id: requestId,
                 object: 'chat.completion.chunk',
@@ -293,6 +306,10 @@ app.post('/v1/chat/completions', async (req, res) => {
             await agent.waitForIdle();
             unsubscribe();
             
+            const duration = Date.now() - startTime;
+            console.log(`✅ [${requestId}] Response in ${duration}ms`);
+            console.log(`   Assistant message: ${assistantMessage.substring(0, 200)}${assistantMessage.length > 200 ? '...' : ''}`);
+            
             res.json({
                 id: requestId,
                 object: 'chat.completion',
@@ -306,7 +323,10 @@ app.post('/v1/chat/completions', async (req, res) => {
             });
         }
     } catch (error) {
-        console.error('Chat API error:', error);
+        const duration = Date.now() - startTime;
+        console.error(`❌ [${requestId}] Chat API error after ${duration}ms:`, error.message);
+        console.error(`   Stack:`, error.stack);
+        
         if (stream) {
             res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
             res.write('data: [DONE]\n\n');
