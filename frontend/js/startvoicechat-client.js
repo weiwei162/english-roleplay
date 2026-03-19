@@ -129,7 +129,14 @@ class StartVoiceChatClient {
         console.log('📥 Fetching token from backend...', { roomId, uid });
         
         try {
-            const response = await fetch(`/api/token?roomId=${encodeURIComponent(roomId)}&uid=${encodeURIComponent(uid)}`);
+            // 获取认证 token
+            const authToken = window.authClient?.token;
+            
+            const response = await fetch(`/api/token?roomId=${encodeURIComponent(roomId)}&uid=${encodeURIComponent(uid)}`, {
+                headers: {
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                }
+            });
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -146,9 +153,7 @@ class StartVoiceChatClient {
             
         } catch (error) {
             console.error('❌ Failed to fetch token:', error);
-            // 降级：前端生成 Token（简化版，生产环境不推荐）
-            console.warn('⚠️ Falling back to client-side token generation');
-            return this.generateToken(roomId, uid);
+            throw error;
         }
     }
 

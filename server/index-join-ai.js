@@ -391,7 +391,7 @@ app.get('/api/characters', (req, res) => {
 
 // ==================== 获取 Token ====================
 
-app.get('/api/token', (req, res) => {
+app.get('/api/token', optionalAuth, (req, res) => {
     try {
         const { roomId, uid } = req.query;
         
@@ -411,7 +411,8 @@ app.get('/api/token', (req, res) => {
             86400 // 24 小时
         );
         
-        console.log('🔑 Generated token for:', { roomId, uid });
+        const username = req.user ? req.user.username : 'anonymous';
+        console.log('🔑 Generated token for:', { roomId, uid, user: username });
         
         res.json({
             success: true,
