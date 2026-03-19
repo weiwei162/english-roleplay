@@ -395,6 +395,13 @@ function getCustomLLMConfig(options = {}) {
         sessionId = '' // 会话 ID，与 userId、character、scene 绑定
     } = options;
     
+    // 构建 Custom 参数（JSON 字符串）
+    const customParams = {};
+    if (sessionId) {
+        customParams.SessionId = sessionId;
+    }
+    const customJson = Object.keys(customParams).length > 0 ? JSON.stringify(customParams) : undefined;
+    
     return {
         // ASR 配置 - 火山流式语音识别大模型
         ASRConfig: {
@@ -427,7 +434,7 @@ function getCustomLLMConfig(options = {}) {
             SystemMessages: [systemPrompt],
             HistoryLength: historyLength,
             Prefill: false, // 是否开启预填充（降低延迟但增加调用次数）
-            SessionId: sessionId // 会话 ID，用于 pi-agent 会话管理
+            Custom: customJson // 自定义 JSON 参数（包含 SessionId）
         },
         
         // TTS 配置 - 火山语音合成大模型
