@@ -163,10 +163,16 @@ class StartVoiceChatClient {
         console.log('🤖 [2/5] Joining AI character to room...', { character, scene: sceneId, roomId: this.roomId });
         
         try {
+            // 获取认证 token
+            const authToken = window.authClient?.token;
+            
             // 调用后端 API，将 AI 加入已创建的 RTC 房间
             const response = await fetch('/api/join-ai', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+                },
                 body: JSON.stringify({
                     roomId: this.roomId,
                     character: character,
