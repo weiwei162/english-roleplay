@@ -112,6 +112,9 @@ class VolcStartVoiceChatClient {
         
         const url = `https://${this.host}/?${query}`;
         
+        console.log(`📡 Calling ${action} API: ${url}`);
+        console.log(`📦 Request body:`, JSON.stringify(body, null, 2));
+        
         return new Promise((resolve, reject) => {
             const req = https.request(url, {
                 method: 'POST',
@@ -123,17 +126,23 @@ class VolcStartVoiceChatClient {
                     try {
                         const result = JSON.parse(data);
                         if (res.statusCode === 200) {
+                            console.log(`✅ ${action} API success:`, result.ResponseMetadata?.RequestId || 'OK');
                             resolve(result);
                         } else {
-                            reject(new Error(`API Error ${res.statusCode}: ${data}`));
+                            console.error(`❌ ${action} API Error ${res.statusCode}:`, data);
+                            reject(new Error(`${action} API Error ${res.statusCode}: ${JSON.stringify(result)}`));
                         }
                     } catch (e) {
+                        console.error(`❌ ${action} API Parse Error:`, e.message, 'Response:', data);
                         reject(new Error(`Parse Error: ${e.message}, Response: ${data}`));
                     }
                 });
             });
             
-            req.on('error', reject);
+            req.on('error', (err) => {
+                console.error(`❌ ${action} API Request Error:`, err.message);
+                reject(err);
+            });
             req.write(bodyString);
             req.end();
         });
@@ -156,6 +165,7 @@ class VolcStartVoiceChatClient {
      */
     async startVoiceChatComponent(config) {
         console.log(`🤖 [分组件] 开启 AI 对话 - Room: ${config.roomId}, TaskId: ${config.taskId}`);
+        console.log(`   TargetUserId: ${config.targetUserId}, AgentUserId: ${config.agentUserId || 'AIAssistant'}`);
         
         const body = {
             AppId: config.appId,
@@ -174,9 +184,17 @@ class VolcStartVoiceChatClient {
             }
         };
         
-        const result = await this.callAPI('StartVoiceChat', body);
-        console.log('✅ [分组件] AI 对话已开启:', result);
-        return result;
+        try {
+            const result = await this.callAPI('StartVoiceChat', body);
+            console.log('✅ [分组件] AI 对话已开启:', result);
+            return result;
+        } catch (error) {
+            console.error('❌ [分组件] StartVoiceChat 失败:', error.message);
+            console.error('   AppId:', config.appId);
+            console.error('   RoomId:', config.roomId);
+            console.error('   TaskId:', config.taskId);
+            throw error;
+        }
     }
 
     /**
@@ -194,6 +212,7 @@ class VolcStartVoiceChatClient {
      */
     async startVoiceChatS2S(config) {
         console.log(`🤖 [端到端] 开启 AI 对话 - Room: ${config.roomId}, TaskId: ${config.taskId}`);
+        console.log(`   TargetUserId: ${config.targetUserId}, AgentUserId: ${config.agentUserId || 'AIAssistant'}`);
         
         const body = {
             AppId: config.appId,
@@ -210,9 +229,17 @@ class VolcStartVoiceChatClient {
             }
         };
         
-        const result = await this.callAPI('StartVoiceChat', body);
-        console.log('✅ [端到端] AI 对话已开启:', result);
-        return result;
+        try {
+            const result = await this.callAPI('StartVoiceChat', body);
+            console.log('✅ [端到端] AI 对话已开启:', result);
+            return result;
+        } catch (error) {
+            console.error('❌ [端到端] StartVoiceChat 失败:', error.message);
+            console.error('   AppId:', config.appId);
+            console.error('   RoomId:', config.roomId);
+            console.error('   TaskId:', config.taskId);
+            throw error;
+        }
     }
 
     /**
