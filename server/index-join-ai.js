@@ -444,9 +444,15 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
     
     const targetUserId = `ai_${character}_${roomId}`;
     
+    // 生成 sessionId（与 userId、character、sceneId 绑定）
+    const sessionId = `session_${userId}_${character}_${sceneId}_${Date.now()}`;
+    
     const combinedConfig = combineCharacterAndScenePrompt(CHARACTER_CONFIGS[character], sceneId);
     const sceneConfig = getScenePrompt(sceneId);
     const taskId = `task_${roomId}_${Date.now()}`;
+    
+    // Features 配置（可选）
+    const features = { Http: true };
     
     let result;
     
@@ -468,6 +474,8 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             roomId,
             taskId,
             targetUserId,
+            sessionId,
+            features,
             asrConfig: config.ASRConfig,
             llmConfig: config.LLMConfig,
             ttsConfig: config.TTSConfig,
@@ -484,6 +492,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             maxTokens: parseInt(process.env.PI_AGENT_MAX_TOKENS || '500'),
             topP: parseFloat(process.env.PI_AGENT_TOP_P || '0.9'),
             historyLength: parseInt(process.env.PI_AGENT_HISTORY_LENGTH || '3'),
+            sessionId, // 传递 sessionId 给 pi-agent
             asrAppId: process.env.VOLC_ASR_APP_ID,
             asrToken: process.env.VOLC_ASR_TOKEN,
             ttsAppId: process.env.VOLC_TTS_APP_ID,
@@ -498,6 +507,8 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             roomId,
             taskId,
             targetUserId,
+            sessionId,
+            features,
             asrConfig: config.ASRConfig,
             llmConfig: config.LLMConfig,
             ttsConfig: config.TTSConfig,
@@ -520,6 +531,8 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             roomId,
             taskId,
             targetUserId,
+            sessionId,
+            features,
             s2sConfig: config,
             welcomeMessage: sceneConfig.welcomeMessage,
             idleTimeout: 180
@@ -533,6 +546,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
         aiMode: AI_MODE,
         userId,
         scene: sceneId,
+        sessionId,
         createdAt: Date.now()
     });
     

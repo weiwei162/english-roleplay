@@ -148,11 +148,13 @@ class VolcStartVoiceChatClient {
      * @param {string} config.taskId - 任务 ID（AppId+RoomId 下唯一）
      * @param {string} config.targetUserId - 真人用户 ID
      * @param {string} config.agentUserId - AI 助手用户 ID（可选，默认 AIAssistant）
+     * @param {string} config.sessionId - 会话 ID（与 userId、character、scene 绑定）
      * @param {Object} config.asrConfig - ASR 配置
      * @param {Object} config.llmConfig - LLM 配置
      * @param {Object} config.ttsConfig - TTS 配置
      * @param {string} config.welcomeMessage - 欢迎词
      * @param {number} config.idleTimeout - 空闲超时（秒）
+     * @param {Object} config.features - 可选功能配置，例如 {Http: true}
      */
     async startVoiceChatComponent(config) {
         console.log(`🤖 [分组件] 开启 AI 对话 - Room: ${config.roomId}, TaskId: ${config.taskId}`);
@@ -174,6 +176,16 @@ class VolcStartVoiceChatClient {
             }
         };
         
+        // 添加可选的 SessionId
+        if (config.sessionId) {
+            body.AgentConfig.SessionId = config.sessionId;
+        }
+        
+        // 添加可选的 Features
+        if (config.features) {
+            body.Features = config.features;
+        }
+        
         const result = await this.callAPI('StartVoiceChat', body);
         console.log('✅ [分组件] AI 对话已开启:', result);
         return result;
@@ -188,9 +200,11 @@ class VolcStartVoiceChatClient {
      * @param {string} config.taskId - 任务 ID
      * @param {string} config.targetUserId - 真人用户 ID
      * @param {string} config.agentUserId - AI 助手用户 ID（可选，默认 AIAssistant）
+     * @param {string} config.sessionId - 会话 ID（与 userId、character、scene 绑定）
      * @param {Object} config.s2sConfig - S2S 配置
      * @param {string} config.welcomeMessage - 欢迎词
      * @param {number} config.idleTimeout - 空闲超时（秒）
+     * @param {Object} config.features - 可选功能配置，例如 {Http: true}
      */
     async startVoiceChatS2S(config) {
         console.log(`🤖 [端到端] 开启 AI 对话 - Room: ${config.roomId}, TaskId: ${config.taskId}`);
@@ -209,6 +223,16 @@ class VolcStartVoiceChatClient {
                 IdleTimeout: config.idleTimeout || 180
             }
         };
+        
+        // 添加可选的 SessionId
+        if (config.sessionId) {
+            body.AgentConfig.SessionId = config.sessionId;
+        }
+        
+        // 添加可选的 Features
+        if (config.features) {
+            body.Features = config.features;
+        }
         
         const result = await this.callAPI('StartVoiceChat', body);
         console.log('✅ [端到端] AI 对话已开启:', result);
@@ -391,7 +415,8 @@ function getCustomLLMConfig(options = {}) {
         temperature = 0.7,
         maxTokens = 500,
         topP = 0.9,
-        historyLength = 3
+        historyLength = 3,
+        sessionId = '' // 会话 ID，与 userId、character、scene 绑定
     } = options;
     
     return {
@@ -425,7 +450,8 @@ function getCustomLLMConfig(options = {}) {
             TopP: topP,
             SystemMessages: [systemPrompt],
             HistoryLength: historyLength,
-            Prefill: false // 是否开启预填充（降低延迟但增加调用次数）
+            Prefill: false, // 是否开启预填充（降低延迟但增加调用次数）
+            SessionId: sessionId // 会话 ID，用于 pi-agent 会话管理
         },
         
         // TTS 配置 - 火山语音合成大模型
