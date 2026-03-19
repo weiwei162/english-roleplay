@@ -88,7 +88,10 @@ class StartVoiceChatClient {
             return { roomId: this.roomId, userId: this.localUserId, appId: this.appId };
             
         } catch (error) {
-            console.error('❌ Failed to create room:', error);
+            console.error('❌ [1/5] Create room failed:', error.message);
+            console.error('   RoomId:', roomId);
+            console.error('   AppId:', this.appId);
+            console.error('   LocalUserId:', this.localUserId);
             this.onError(error);
             throw error;
         }
@@ -211,7 +214,11 @@ class StartVoiceChatClient {
             return data;
             
         } catch (error) {
-            console.error('❌ Failed to join AI:', error);
+            console.error('❌ [2/5] Join AI failed:', error.message);
+            console.error('   RoomId:', this.roomId);
+            console.error('   Character:', character);
+            console.error('   SceneId:', sceneId);
+            console.error('   TargetUserId:', this.localUserId);
             this.onError(error);
             throw error;
         }
