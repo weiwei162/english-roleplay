@@ -396,10 +396,22 @@ app.get('/api/token', (req, res) => {
         const { roomId, uid } = req.query;
         
         if (!roomId || !uid) {
-            return res.status(400).json({ success: false, error: 'roomId and uid required' });
+            return res.status(400).json({ 
+                error: 'roomId and uid required',
+                success: false
+            });
         }
         
-        const token = client.generateToken(roomId, uid);
+        // 直接使用 generateToken() 生成 Token（使用官方 AccessToken.js）
+        const token = generateToken(
+            process.env.VOLC_APP_ID,
+            process.env.VOLC_APP_KEY,
+            roomId,
+            uid,
+            86400 // 24 小时
+        );
+        
+        console.log('🔑 Generated token for:', { roomId, uid });
         
         res.json({
             success: true,
@@ -407,11 +419,14 @@ app.get('/api/token', (req, res) => {
             uid,
             token,
             appId: process.env.VOLC_APP_ID,
-            expireIn: 86400  // 24 小时
+            expireIn: 86400
         });
     } catch (error) {
-        console.error('Token generation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        console.error('❌ Generate token error:', error);
+        res.status(500).json({ 
+            error: error.message,
+            success: false
+        });
     }
 });
 

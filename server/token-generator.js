@@ -4,7 +4,7 @@
  * 基于官方 AccessToken.js 实现
  */
 
-import { AccessToken } from './AccessToken.js';
+import { AccessToken, Parse, privileges } from './AccessToken.js';
 
 /**
  * 生成 RTC Token
@@ -29,7 +29,7 @@ function generateToken(appId, appKey, roomId, uid, expireSeconds = 86400) {
     const expireAt = now + expireSeconds;
     
     // 创建 Token
-    const token = new AccessToken.AccessToken(appId, appKey, roomId, uid);
+    const token = new AccessToken(appId, appKey, roomId, uid);
     
     // 设置过期时间
     token.expireTime(expireAt);
@@ -37,8 +37,8 @@ function generateToken(appId, appKey, roomId, uid, expireSeconds = 86400) {
     // 添加权限
     // PrivPublishStream (0) = 发布流权限
     // PrivSubscribeStream (4) = 订阅流权限
-    token.addPrivilege(AccessToken.privileges.PrivPublishStream, expireAt);
-    token.addPrivilege(AccessToken.privileges.PrivSubscribeStream, expireAt);
+    token.addPrivilege(privileges.PrivPublishStream, expireAt);
+    token.addPrivilege(privileges.PrivSubscribeStream, expireAt);
     
     // 生成 Token 字符串
     return token.serialize();
@@ -56,7 +56,7 @@ function generateWildcardToken(appId, appKey, uid, expireSeconds = 86400) {
  */
 function verifyToken(tokenString, appKey) {
     try {
-        const token = AccessToken.Parse(tokenString);
+        const token = Parse(tokenString);
         
         if (!token) {
             return {

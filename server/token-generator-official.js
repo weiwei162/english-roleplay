@@ -191,7 +191,7 @@ function verifyToken(tokenString, appKey) {
 
         // 验证签名
         const expectedSignature = crypto.createHmac('sha256', appKey).update(message).digest();
-        const signatureValid = signature === expectedSignature.toString();
+        const signatureValid = signature.equals(expectedSignature);
 
         // 解析消息
         const msgBuf = new ReadByteBuf(message);

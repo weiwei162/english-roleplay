@@ -10,7 +10,7 @@
  */
 
 import crypto from 'crypto';
-import { generateToken as generateOfficialToken } from './token-generator-official.js';
+import { generateToken as generateOfficialToken } from './token-generator.js';
 import https from 'https';
 
 class VolcStartVoiceChatClient {
