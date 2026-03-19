@@ -62,6 +62,7 @@ const LLM_PROVIDER = process.env.LLM_PROVIDER || 'openai';
 const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
 const LLM_API_KEY = process.env.LLM_API_KEY;
 const LLM_BASE_URL = process.env.LLM_BASE_URL;
+const LLM_CUSTOM_PROVIDER = process.env.LLM_CUSTOM_PROVIDER || 'openai'; // 自定义 BASE_URL 时的提供商
 
 // 获取模型（支持内置提供商和自定义 OpenAI compatible 服务）
 function getLLMModel() {
@@ -71,7 +72,7 @@ function getLLMModel() {
             id: LLM_MODEL,
             name: LLM_MODEL,
             api: 'openai-completions',
-            provider: 'custom',
+            provider: LLM_CUSTOM_PROVIDER,
             baseUrl: LLM_BASE_URL,
             reasoning: false,
             input: ['text', 'image'],
