@@ -482,6 +482,9 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             idleTimeout: 180
         });
     } else if (AI_MODE === 'custom') {
+        // Feature 配置（用于 HTTP 域名测试）
+        const feature = process.env.PI_AGENT_FEATURE ? JSON.parse(process.env.PI_AGENT_FEATURE) : undefined;
+        
         const config = getCustomLLMConfig({
             customLlmUrl: process.env.PI_AGENT_URL || `http://localhost:${PORT}/v1/chat/completions`,
             customLlmApiKey: process.env.PI_AGENT_API_KEY || 'pi-agent-secret-key',
@@ -492,6 +495,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             topP: parseFloat(process.env.PI_AGENT_TOP_P || '0.9'),
             historyLength: parseInt(process.env.PI_AGENT_HISTORY_LENGTH || '3'),
             sessionId, // 传递 sessionId 给 pi-agent（放在 LLMConfig 里）
+            feature, // Feature 参数，例如 {Http: true}
             asrAppId: process.env.VOLC_ASR_APP_ID,
             asrToken: process.env.VOLC_ASR_TOKEN,
             ttsAppId: process.env.VOLC_TTS_APP_ID,

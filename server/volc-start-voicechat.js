@@ -419,7 +419,8 @@ function getCustomLLMConfig(options = {}) {
         maxTokens = 500,
         topP = 0.9,
         historyLength = 3,
-        sessionId = '' // 会话 ID，与 userId、character、scene 绑定
+        sessionId = '', // 会话 ID，与 userId、character、scene 绑定
+        feature = undefined // Feature 参数，例如 {Http: true} 用于 HTTP 域名测试
     } = options;
     
     // 构建 Custom 参数（JSON 字符串）
@@ -461,7 +462,8 @@ function getCustomLLMConfig(options = {}) {
             SystemMessages: [systemPrompt],
             HistoryLength: historyLength,
             Prefill: false, // 是否开启预填充（降低延迟但增加调用次数）
-            Custom: customJson // 自定义 JSON 参数（包含 SessionId）
+            Custom: customJson, // 自定义 JSON 参数（包含 SessionId）
+            Feature: feature ? JSON.stringify(feature) : undefined // Feature 参数，例如 {"Http":true}
         },
         
         // TTS 配置 - 火山语音合成大模型
