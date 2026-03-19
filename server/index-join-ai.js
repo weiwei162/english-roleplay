@@ -590,6 +590,9 @@ app.get('/', (req, res) => {
 // ==================== 启动服务器 ====================
 
 function startServer() {
+    // 同时启动 HTTP 和 HTTPS 服务器
+    startHTTP();
+    
     if (USE_HTTPS) {
         try {
             const httpsOptions = {
@@ -602,11 +605,8 @@ function startServer() {
             });
         } catch (error) {
             console.error('❌ HTTPS setup failed:', error.message);
-            console.log('📌 Starting with HTTP instead...');
-            startHTTP();
+            console.log('⚠️  Only HTTP available');
         }
-    } else {
-        startHTTP();
     }
 }
 
@@ -614,9 +614,6 @@ function startHTTP() {
     app.listen(PORT, () => {
         console.log(`✅ HTTP server running on http://localhost:${PORT}`);
         console.log(`📱 Access: http://localhost:${PORT}`);
-        if (USE_HTTPS) {
-            console.log(`🔒 HTTPS: https://localhost:${HTTPS_PORT}`);
-        }
     });
 }
 
