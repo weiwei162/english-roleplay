@@ -435,14 +435,16 @@ app.get('/api/token', optionalAuth, (req, res) => {
 // ==================== AI 加入房间 ====================
 
 app.post('/api/join-ai', authMiddleware, async (req, res) => {
-    const { roomId, character, sceneId } = req.body;
+    const { roomId, character, sceneId, targetUserId } = req.body;
     const userId = req.user.username;
     
-    if (!roomId || !character || !sceneId) {
-        return res.status(400).json({ error: 'roomId, character, and sceneId required' });
+    if (!roomId || !character || !sceneId || !targetUserId) {
+        return res.status(400).json({ error: 'roomId, character, sceneId, and targetUserId required' });
     }
     
-    const targetUserId = `ai_${character}_${roomId}`;
+    // targetUserId: 真人用户 ID（前端传入）
+    // agentUserId: AI Bot 的 ID（后端生成）
+    const agentUserId = `ai_${character}_${roomId}`;
     
     // 生成 sessionId（与 userId、character、sceneId 绑定）
     // sessionId 只用于 custom 模式，传递给 pi-agent
@@ -472,6 +474,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             roomId,
             taskId,
             targetUserId,
+            agentUserId,
             asrConfig: config.ASRConfig,
             llmConfig: config.LLMConfig,
             ttsConfig: config.TTSConfig,
@@ -503,6 +506,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             roomId,
             taskId,
             targetUserId,
+            agentUserId,
             asrConfig: config.ASRConfig,
             llmConfig: config.LLMConfig,
             ttsConfig: config.TTSConfig,

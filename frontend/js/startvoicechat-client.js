@@ -336,37 +336,35 @@ class StartVoiceChatClient {
             }
         });
         
-        // 用户发布流
+        // 用户发布流 - 只订阅 AI 用户的流
         this.engine.on(events.onUserPublishStream || 'onUserPublishStream', async (e) => {
             const { userId, mediaType } = e;
-            console.log('📥 User published stream:', userId, mediaType);
+            
+            // 只处理 AI 用户的流
+            if (!userId || !userId.startsWith('ai_')) {
+                return;
+            }
+            
+            console.log('📥 AI published stream:', userId, mediaType);
             
             try {
-                // 订阅流（第二个参数是数字）
-                // 1=音频，2=视频，3=音频 + 视频
-                let subscribeType = mediaType;
-                
-                // 如果是 AI 角色，通常订阅音频 + 视频 (3)
-                if (userId.startsWith('ai_')) {
-                    subscribeType = 3; // 音频 + 视频
-                }
+                // 订阅 AI 的音频 + 视频 (3)
+                const subscribeType = 3; // 音频 + 视频
                 
                 await this.engine.subscribeStream(userId, subscribeType);
                 
-                console.log('✅ Subscribed to', userId, 'stream (type:', subscribeType + ')');
+                console.log('✅ Subscribed to AI stream:', userId, '(type:', subscribeType + ')');
                 
-                // 如果是远端用户的流（不是自己）
-                if (userId !== this.localUserId) {
-                    this.remoteUsers.set(userId, { userId, mediaType });
-                    
-                    // 如果是视频流或音视频流，设置播放器
-                    if (mediaType === 2 || mediaType === 3) {
-                        this.setupRemoteVideo(userId);
-                    }
-                    
-                    // 触发远端流回调
-                    this.onRemoteStream({ userId, mediaType });
+                // 设置远端视频播放器
+                this.remoteUsers.set(userId, { userId, mediaType });
+                
+                // 如果是视频流或音视频流，设置播放器
+                if (mediaType === 2 || mediaType === 3) {
+                    this.setupRemoteVideo(userId);
                 }
+                
+                // 触发远端流回调
+                this.onRemoteStream({ userId, mediaType });
                 
             } catch (error) {
                 console.error('❌ Subscribe error:', error);
@@ -399,14 +397,25 @@ class StartVoiceChatClient {
         });
         
         // 音频数据（可选：用于音量检测）
+        // 只监听 AI 用户的音频
         this.engine.on(events.onAudioData || 'onAudioData', (e) => {
+            // 只处理 AI 用户的音频数据
+            if (!e.userId || !e.userId.startsWith('ai_')) {
+                return;
+            }
             // 可以在这里处理接收到的音频数据
-            // console.log('🎵 Audio data from', e.userId, ':', e.data.byteLength, 'bytes');
+            // console.log('🎵 Audio data from AI:', e.userId, ':', e.data.byteLength, 'bytes');
         });
         
         // 字幕消息回调（二进制数据，magic number: "subv"）
+        // 只接收 AI 用户的字幕
         this.engine.on(events.onRoomBinaryMessageReceived || 'onRoomBinaryMessageReceived', (e) => {
-            console.log('💬 Received binary message from:', e.userId, 'size:', e.message?.byteLength || e.data?.length);
+            // 只处理 AI 用户的字幕消息
+            if (!e.userId || !e.userId.startsWith('ai_')) {
+                return;
+            }
+            
+            console.log('💬 Received subtitle from AI:', e.userId, 'size:', e.message?.byteLength || e.data?.length);
             
             try {
                 // 解析字幕数据
