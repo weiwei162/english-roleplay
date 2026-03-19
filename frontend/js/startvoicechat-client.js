@@ -181,7 +181,7 @@ class StartVoiceChatClient {
                 body: JSON.stringify({
                     roomId: this.roomId,
                     character: character,
-                    scene: sceneId, // 传递场景信息
+                    sceneId: sceneId, // 传递场景信息
                     targetUserId: this.localUserId // 告诉 AI 要对话的用户
                 })
             });
