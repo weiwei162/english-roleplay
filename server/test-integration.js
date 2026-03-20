@@ -3,7 +3,7 @@
  * StartVoiceChat 前后端集成测试
  */
 
-const https = require('https');
+import https from 'https';
 
 const BASE_URL = 'http://localhost:3000';
 

@@ -4,7 +4,7 @@
  * 验证是否符合火山引擎 CustomLLM 标准
  */
 
-const http = require('http');
+import http from 'http';
 
 const TEST_CONFIG = {
     host: 'localhost',

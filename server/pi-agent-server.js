@@ -9,9 +9,9 @@
  * - 结束符：data: [DONE]
  */
 
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import 'dotenv/config';
 
 const app = express();
 app.use(cors());
