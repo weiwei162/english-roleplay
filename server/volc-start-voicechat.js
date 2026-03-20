@@ -533,23 +533,43 @@ const CHARACTER_BASE_CONFIGS = {
 /**
  * TTS 音色配置（按模型类型分离）
  * 
- * 分组件模式 (volcano_bidirection): 使用 ttsVoiceType
+ * 分组件模式 (volcano_bidirection): 使用 ttsVoiceType + ttsResourceId
  * 端到端模式 (S2S): 使用 s2sSpeaker
  * 
  * 音色列表参考：
  * - 分组件：https://www.volcengine.com/docs/6348/1899868
  * - S2S: https://www.volcengine.com/docs/6348/1558163
+ * 
+ * 注意：ResourceId 和 voice_type 需要匹配！
+ * 不同 ResourceId 对应不同的音色集合。
  */
 const TTS_VOICE_CONFIGS = {
-    // 分组件模式音色映射 (ttsVoiceType)
+    // 分组件模式音色映射 (ttsVoiceType + ttsResourceId)
+    // ResourceId: volc.service_type.10029 (语音合成大模型)
     component: {
-        emma: 'zh_female_linjianvhai_moon_bigtts',  // 温柔女声
-        tommy: 'zh_male_xiaotian_jupiter_bigtts',   // 小男孩
-        lily: 'zh_female_linjianvhai_moon_bigtts',  // 清新女声
-        mike: 'zh_male_yunzhou_jupiter_bigtts',     // 运动男声
-        rose: 'zh_female_linjianvhai_moon_bigtts'   // 温柔女声
+        emma: {
+            voiceType: 'zh_female_linjianvhai_moon_bigtts',  // 温柔女声（月亮姐姐）
+            resourceId: 'volc.service_type.10029'
+        },
+        tommy: {
+            voiceType: 'zh_male_xiaotian_jupiter_bigtts',   // 小男孩（小天）
+            resourceId: 'volc.service_type.10029'
+        },
+        lily: {
+            voiceType: 'zh_female_linjianvhai_moon_bigtts',  // 清新女声（月亮姐姐）
+            resourceId: 'volc.service_type.10029'
+        },
+        mike: {
+            voiceType: 'zh_male_yunzhou_jupiter_bigtts',     // 运动男声（云舟）
+            resourceId: 'volc.service_type.10029'
+        },
+        rose: {
+            voiceType: 'zh_female_linjianvhai_moon_bigtts',   // 温柔女声（月亮姐姐）
+            resourceId: 'volc.service_type.10029'
+        }
     },
     // 端到端模式音色映射 (s2sSpeaker)
+    // S2S 模式下 ResourceId 由模型版本决定，不需要单独配置
     s2s: {
         emma: 'zh_female_vv_jupiter_bigtts',        // 通用女声
         tommy: 'zh_male_xiaotian_jupiter_bigtts',   // 小男孩
@@ -574,13 +594,25 @@ function getCharacterConfig(characterId, aiMode = 'component') {
     
     // 确定 TTS 音色映射类型
     const ttsType = aiMode === 's2s' ? 's2s' : 'component';
-    const ttsVoice = TTS_VOICE_CONFIGS[ttsType][characterId];
+    const ttsConfig = TTS_VOICE_CONFIGS[ttsType][characterId];
     
-    return {
-        ...baseConfig,
-        ttsVoiceType: ttsVoice,      // 分组件模式使用
-        s2sSpeaker: ttsVoice         // S2S 模式使用（实际应该用 s2s 映射）
-    };
+    if (!ttsConfig) {
+        throw new Error(`Unknown character: ${characterId} for TTS type ${ttsType}`);
+    }
+    
+    // 合并配置
+    if (aiMode === 's2s') {
+        return {
+            ...baseConfig,
+            s2sSpeaker: ttsConfig  // S2S 模式只需要 speaker
+        };
+    } else {
+        return {
+            ...baseConfig,
+            ttsVoiceType: ttsConfig.voiceType,    // 分组件模式需要 voiceType
+            ttsResourceId: ttsConfig.resourceId   // 分组件模式需要 resourceId
+        };
+    }
 }
 
 /**

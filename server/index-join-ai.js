@@ -485,10 +485,11 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             llmEndpointId: process.env.VOLC_LLM_ENDPOINT_ID,
             ttsAppId: process.env.VOLC_TTS_APP_ID,
             ttsToken: process.env.VOLC_TTS_TOKEN,
-            ttsVoiceType: characterConfig.ttsVoiceType, // 使用分组件模式音色
+            ttsVoiceType: characterConfig.ttsVoiceType, // 使用角色配置的音色
+            ttsResourceId: characterConfig.ttsResourceId, // 使用角色配置的 ResourceId（与音色匹配）
             systemPrompt: combinedConfig.systemPrompt,
             asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
-            ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
+            contextHistoryLength: 3
         });
         
         result = await client.startVoiceChatComponent({
@@ -522,9 +523,10 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             asrToken: process.env.VOLC_ASR_TOKEN,
             ttsAppId: process.env.VOLC_TTS_APP_ID,
             ttsToken: process.env.VOLC_TTS_TOKEN,
-            ttsVoiceType: characterConfig.ttsVoiceType, // 使用分组件模式音色（custom 模式用 component 的 TTS）
+            ttsVoiceType: characterConfig.ttsVoiceType, // 使用角色配置的音色
+            ttsResourceId: characterConfig.ttsResourceId, // 使用角色配置的 ResourceId（与音色匹配）
             asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
-            ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
+            contextHistoryLength: 3
         });
         
         result = await client.startVoiceChatComponent({
