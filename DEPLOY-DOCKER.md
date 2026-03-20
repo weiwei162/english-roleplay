@@ -92,16 +92,9 @@ RUN npm ci --only=production
 # 复制源代码
 COPY . .
 
-# 暴露端口
-EXPOSE 3001
-
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
-
-# 启动命令
-CMD ["node", "pi-agent-real.js"]
 ```
+
+**注意：** pi-agent 已集成到主服务 `index-join-ai.js` 中，不需要单独部署。
 
 ---
 
@@ -419,8 +412,8 @@ FROM node:20-alpine
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/*.js ./
-EXPOSE 3001
-CMD ["node", "pi-agent-real.js"]
+EXPOSE 3000
+CMD ["node", "index-join-ai.js"]
 ```
 
 ### 2. 使用镜像缓存

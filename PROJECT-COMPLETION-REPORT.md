@@ -41,7 +41,7 @@
 - [x] Token 使用统计
 
 **文件**:
-- `server/pi-agent-real.js` - 真实 Agent 实现
+- pi-agent 已集成到 `index-join-ai.js` 中
 - `server/volc-start-voicechat.js` - CustomLLM 配置
 - `server/index-join-ai.js` - 主服务集成
 

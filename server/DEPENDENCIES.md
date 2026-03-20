@@ -125,7 +125,7 @@ npm install @volcengine/rtc cors dotenv express jsonwebtoken
 npm install openai  # 或 @anthropic-ai/sdk 或 ollama
 ```
 
-然后参考 `pi-agent-server.js` 实现简单的 LLM 调用。
+LLM 调用已内置在 `index-join-ai.js` 中（使用 pi-agent-core）。
 
 ---
 

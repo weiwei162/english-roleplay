@@ -103,8 +103,7 @@ english-roleplay/
 │   └── startvoicechat-client.js  # RTC 客户端
 │
 ├── server/                    # 后端代码
-│   ├── pi-agent-real.js       # 真实 LLM ⭐
-│   ├── pi-agent-server.js     # 模拟 LLM
+│   └── (pi-agent 已集成到主服务)
 │   ├── index-join-ai.js       # 主服务
 │   └── .env.example           # 环境变量模板
 │

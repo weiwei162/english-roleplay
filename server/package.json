@@ -6,10 +6,8 @@
   "main": "index-join-ai.js",
   "scripts": {
     "start": "node index-join-ai.js",
-    "start:mock": "node pi-agent-server.js",
     "dev": "nodemon index-join-ai.js",
-    "test": "node test-integration.js",
-    "test:pi-agent": "node test-pi-agent.js"
+    "test": "node test-integration.js"
   },
   "dependencies": {
     "@volcengine/rtc": "^4.68.1",
