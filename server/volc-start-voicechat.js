@@ -300,18 +300,17 @@ class VolcStartVoiceChatClient {
  */
 function getComponentConfig(options = {}) {
     return {
-        // ASR 配置 - 火山流式语音识别大模型
+        // ASR 配置 - 火山流式语音识别大模型（直传模式）
         ASRConfig: {
             Provider: 'volcano',
             ProviderParams: {
                 Mode: 'bigmodel',
-                Credential: {
-                    AppId: options.asrAppId,
-                    AccessToken: options.asrToken,
-                    ApiResourceId: options.asrResourceId || 'volc.bigasr.sauc.duration'
-                },
-                StreamMode: 2, // 双向流式优化版
-                ContextHistoryLength: 3
+                AppId: options.asrAppId,
+                AccessToken: options.asrToken,
+                ApiResourceId: options.asrResourceId || 'volc.bigasr.sauc.duration',
+                StreamMode: 2, // 双向流式优化版（兼顾实时与准确）
+                enable_nonstream: true, // 开启二遍识别，提升准确率
+                ContextHistoryLength: options.contextHistoryLength || 3
             },
             VADConfig: {
                 SilenceTime: 600,
@@ -431,18 +430,17 @@ function getCustomLLMConfig(options = {}) {
     const customJson = Object.keys(customParams).length > 0 ? JSON.stringify(customParams) : undefined;
     
     return {
-        // ASR 配置 - 火山流式语音识别大模型
+        // ASR 配置 - 火山流式语音识别大模型（直传模式）
         ASRConfig: {
             Provider: 'volcano',
             ProviderParams: {
                 Mode: 'bigmodel',
-                Credential: {
-                    AppId: options.asrAppId,
-                    AccessToken: options.asrToken,
-                    ApiResourceId: options.asrResourceId || 'volc.bigasr.sauc.duration'
-                },
-                StreamMode: 2,
-                ContextHistoryLength: historyLength
+                AppId: options.asrAppId,
+                AccessToken: options.asrToken,
+                ApiResourceId: options.asrResourceId || 'volc.bigasr.sauc.duration',
+                StreamMode: 2, // 双向流式优化版（兼顾实时与准确）
+                enable_nonstream: true, // 开启二遍识别，提升准确率
+                ContextHistoryLength: options.contextHistoryLength || historyLength
             },
             VADConfig: {
                 SilenceTime: 600,
