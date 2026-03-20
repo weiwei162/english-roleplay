@@ -697,5 +697,9 @@ export {
     getS2SConfig,
     getCustomLLMConfig,
     CHARACTER_CONFIGS,
+    CHARACTER_BASE_CONFIGS,
+    TTS_VOICE_CONFIGS,
+    getCharacterConfig,
+    combineCharacterAndScenePrompt,
     test
 };
