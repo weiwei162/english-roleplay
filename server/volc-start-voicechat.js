@@ -494,48 +494,115 @@ function getCustomLLMConfig(options = {}) {
 
 // ============== 角色人设 ==============
 
-const CHARACTER_CONFIGS = {
+/**
+ * 角色基础配置（与 TTS 模型无关）
+ */
+const CHARACTER_BASE_CONFIGS = {
     emma: {
         name: 'Miss Emma',
         systemPrompt: 'You are Miss Emma, a gentle English teacher for 5-year-old Chinese kids. Speak in simple English, use short sentences, encourage them to speak. Be warm and patient. Use emojis.',
         systemRole: 'You are Miss Emma, a gentle English teacher.',
-        speakingStyle: 'Warm, patient, encouraging',
-        ttsVoiceType: 'zh_female_linjianvhai_moon_bigtts',
-        s2sSpeaker: 'zh_female_vv_jupiter_bigtts'
+        speakingStyle: 'Warm, patient, encouraging'
     },
     tommy: {
         name: 'Tommy',
         systemPrompt: 'You are Tommy, a 5-year-old American boy. Play with kids and teach them English through games. Use simple words and short sentences. Be playful and energetic.',
         systemRole: 'You are Tommy, a playful 5-year-old boy.',
-        speakingStyle: 'Playful, energetic, simple',
-        ttsVoiceType: 'zh_male_xiaotian_jupiter_bigtts',
-        s2sSpeaker: 'zh_male_xiaotian_jupiter_bigtts'
+        speakingStyle: 'Playful, energetic, simple'
     },
     lily: {
         name: 'Lily',
         systemPrompt: 'You are Lily, a 7-year-old lively girl. Love singing, drawing, and storytelling. Teach English in a warm and encouraging way.',
         systemRole: 'You are Lily, a lively 7-year-old girl.',
-        speakingStyle: 'Lively, warm, creative',
-        ttsVoiceType: 'zh_female_linjianvhai_moon_bigtts',
-        s2sSpeaker: 'zh_female_vv_jupiter_bigtts'
+        speakingStyle: 'Lively, warm, creative'
     },
     mike: {
         name: 'Coach Mike',
         systemPrompt: 'You are Coach Mike, a sunny sports coach. Teach English through sports and activities. Be energetic and positive.',
         systemRole: 'You are Coach Mike, a sports coach.',
-        speakingStyle: 'Energetic, positive, motivational',
-        ttsVoiceType: 'zh_male_yunzhou_jupiter_bigtts',
-        s2sSpeaker: 'zh_male_yunzhou_jupiter_bigtts'
+        speakingStyle: 'Energetic, positive, motivational'
     },
     rose: {
         name: 'Grandma Rose',
         systemPrompt: 'You are Grandma Rose, a kind grandmother. Tell stories and teach life lessons. Speak slowly and gently with love.',
         systemRole: 'You are Grandma Rose, a kind grandmother.',
-        speakingStyle: 'Gentle, slow, loving',
-        ttsVoiceType: 'zh_female_linjianvhai_moon_bigtts',
-        s2sSpeaker: 'zh_female_vv_jupiter_bigtts'
+        speakingStyle: 'Gentle, slow, loving'
     }
 };
+
+/**
+ * TTS 音色配置（按模型类型分离）
+ * 
+ * 分组件模式 (volcano_bidirection): 使用 ttsVoiceType
+ * 端到端模式 (S2S): 使用 s2sSpeaker
+ * 
+ * 音色列表参考：
+ * - 分组件：https://www.volcengine.com/docs/6348/1899868
+ * - S2S: https://www.volcengine.com/docs/6348/1558163
+ */
+const TTS_VOICE_CONFIGS = {
+    // 分组件模式音色映射 (ttsVoiceType)
+    component: {
+        emma: 'zh_female_linjianvhai_moon_bigtts',  // 温柔女声
+        tommy: 'zh_male_xiaotian_jupiter_bigtts',   // 小男孩
+        lily: 'zh_female_linjianvhai_moon_bigtts',  // 清新女声
+        mike: 'zh_male_yunzhou_jupiter_bigtts',     // 运动男声
+        rose: 'zh_female_linjianvhai_moon_bigtts'   // 温柔女声
+    },
+    // 端到端模式音色映射 (s2sSpeaker)
+    s2s: {
+        emma: 'zh_female_vv_jupiter_bigtts',        // 通用女声
+        tommy: 'zh_male_xiaotian_jupiter_bigtts',   // 小男孩
+        lily: 'zh_female_vv_jupiter_bigtts',        // 通用女声
+        mike: 'zh_male_yunzhou_jupiter_bigtts',     // 运动男声
+        rose: 'zh_female_vv_jupiter_bigtts'         // 通用女声
+    }
+};
+
+/**
+ * 获取角色完整配置（根据 AI 模式合并基础配置和 TTS 音色）
+ * 
+ * @param {string} characterId - 角色 ID
+ * @param {string} aiMode - AI 模式：'component' | 's2s' | 'custom'
+ * @returns {Object} 完整的角色配置
+ */
+function getCharacterConfig(characterId, aiMode = 'component') {
+    const baseConfig = CHARACTER_BASE_CONFIGS[characterId];
+    if (!baseConfig) {
+        throw new Error(`Unknown character: ${characterId}`);
+    }
+    
+    // 确定 TTS 音色映射类型
+    const ttsType = aiMode === 's2s' ? 's2s' : 'component';
+    const ttsVoice = TTS_VOICE_CONFIGS[ttsType][characterId];
+    
+    return {
+        ...baseConfig,
+        ttsVoiceType: ttsVoice,      // 分组件模式使用
+        s2sSpeaker: ttsVoice         // S2S 模式使用（实际应该用 s2s 映射）
+    };
+}
+
+/**
+ * 合并角色和场景配置
+ */
+function combineCharacterAndScenePrompt(characterConfig, sceneId) {
+    // 获取完整配置（兼容旧代码直接传入 characterConfig 的情况）
+    const config = typeof characterConfig === 'string' 
+        ? getCharacterConfig(characterConfig, process.env.AI_MODE || 'component')
+        : characterConfig;
+    
+    const sceneConfig = getScenePrompt(sceneId);
+    
+    return {
+        ...config,
+        systemPrompt: `${config.systemPrompt}\n\nScene: ${sceneConfig.name}. ${sceneConfig.description}`,
+        welcomeMessage: sceneConfig.welcomeMessage
+    };
+}
+
+// 向后兼容：保持 CHARACTER_CONFIGS 导出（使用默认 component 模式）
+const CHARACTER_CONFIGS = CHARACTER_BASE_CONFIGS;
 
 // ============== 测试 ==============
 

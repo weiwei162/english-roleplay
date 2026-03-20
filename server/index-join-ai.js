@@ -18,7 +18,7 @@ import https from 'https';
 import http from 'http';
 import { fileURLToPath } from 'url';
 import { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLMConfig, CHARACTER_CONFIGS } from './volc-start-voicechat.js';
-import { combineCharacterAndScenePrompt, getScenePrompt } from './prompts.js';
+import { combineCharacterAndScenePrompt, getScenePrompt, getCharacterConfig } from './volc-start-voicechat.js';
 import { generateToken, generateWildcardToken, verifyToken } from './token-generator.js';
 import { register, login, authMiddleware, optionalAuth } from './auth.js';
 import 'dotenv/config';
@@ -470,7 +470,9 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
     // sessionId 只用于 custom 模式，传递给 pi-agent
     const sessionId = `session_${userId}_${character}_${sceneId}_${Date.now()}`;
     
-    const combinedConfig = combineCharacterAndScenePrompt(CHARACTER_CONFIGS[character], sceneId);
+    // 根据 AI 模式获取角色配置（自动选择正确的 TTS 音色）
+    const characterConfig = getCharacterConfig(character, AI_MODE);
+    const combinedConfig = combineCharacterAndScenePrompt(characterConfig, sceneId);
     const sceneConfig = getScenePrompt(sceneId);
     const taskId = `task_${roomId}_${Date.now()}`;
     
@@ -483,7 +485,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             llmEndpointId: process.env.VOLC_LLM_ENDPOINT_ID,
             ttsAppId: process.env.VOLC_TTS_APP_ID,
             ttsToken: process.env.VOLC_TTS_TOKEN,
-            ttsVoiceType: combinedConfig.ttsVoiceType,
+            ttsVoiceType: characterConfig.ttsVoiceType, // 使用分组件模式音色
             systemPrompt: combinedConfig.systemPrompt,
             asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
             ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
@@ -520,7 +522,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             asrToken: process.env.VOLC_ASR_TOKEN,
             ttsAppId: process.env.VOLC_TTS_APP_ID,
             ttsToken: process.env.VOLC_TTS_TOKEN,
-            ttsVoiceType: combinedConfig.ttsVoiceType,
+            ttsVoiceType: characterConfig.ttsVoiceType, // 使用分组件模式音色（custom 模式用 component 的 TTS）
             asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
             ttsResourceId: process.env.VOLC_TTS_RESOURCE_ID
         });
@@ -537,14 +539,14 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             welcomeMessage: sceneConfig.welcomeMessage,
             idleTimeout: 180
         });
-    } else {
+    } else if (AI_MODE === 's2s') {
         const config = getS2SConfig({
             s2sAppId: process.env.VOLC_S2S_APP_ID,
             s2sToken: process.env.VOLC_S2S_TOKEN,
             modelVersion: process.env.VOLC_S2S_MODEL_VERSION || 'O',
             systemRole: combinedConfig.systemRole,
             speakingStyle: combinedConfig.speakingStyle,
-            speaker: combinedConfig.s2sSpeaker,
+            speaker: characterConfig.s2sSpeaker, // 使用 S2S 模式音色
             outputMode: parseInt(process.env.VOLC_S2S_OUTPUT_MODE || '0')
         });
         
@@ -576,7 +578,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
         roomId,
         taskId,
         character,
-        characterName: CHARACTER_CONFIGS[character].name,
+        characterName: characterConfig.name,
         targetUserId,
         aiMode: AI_MODE,
         success: true
