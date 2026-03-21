@@ -12,8 +12,7 @@ body {
 }
 
 .app-container {
-    max-width: 800px;
-    margin: 0 auto;
+    width: 100%;
     height: 100vh;
     display: flex;
     flex-direction: column;
@@ -170,16 +169,22 @@ h1 {
 /* Character Layer */
 .character-layer {
     position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 10;
     pointer-events: none;
 }
 
 .character-sprite {
     position: absolute;
+    left: 50%;  /* 初始位置：水平居中 */
+    top: 60%;   /* 初始位置：垂直 60% */
     transition: left 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55),
                 top 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     /* 移除浮动动画，避免与 transform 冲突导致位置偏移 */
-    /* 使用 transform 居中（只在初始化时使用，后续位置由 left/top 控制） */
+    /* 使用 transform 居中 */
     transform: translate(-50%, -50%);
 }
 

@@ -59,6 +59,17 @@ let ctx = null;
             rotation: true,
             wobble: true
         },
+        dust: {
+            name: '灰尘',
+            emoji: ['💨', '☁️', '💫', '✨'],
+            colors: ['#BDBDBD', '#E0E0E0', '#9E9E9E', '#757575'],
+            size: { min: 8, max: 20 },
+            speed: { min: 1, max: 4 },
+            lifetime: 1500,
+            gravity: 0.1,
+            rotation: false,
+            wobble: false
+        },
         leaves: {
             name: '落叶',
             emoji: ['🍂', '🍁', '🍃', '🌿'],
