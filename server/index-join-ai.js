@@ -15,11 +15,11 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
-import http from 'http';
 import { fileURLToPath } from 'url';
-import { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLMConfig, CHARACTER_CONFIGS, getCharacterConfig, combineCharacterAndScenePrompt } from './volc-start-voicechat.js';
-import { generateToken, generateWildcardToken, verifyToken } from './token-generator.js';
-import { register, login, authMiddleware, optionalAuth } from './auth.js';
+import { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLMConfig, CHARACTER_CONFIGS, getCharacterConfig } from './volc-start-voicechat.js';
+import { combineCharacterAndScenePrompt } from './prompts.js';
+import { generateToken } from './token-generator.js';
+import { register, login, verifyToken, authMiddleware } from './auth.js';
 import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -59,7 +59,6 @@ import { getModel } from '@mariozechner/pi-ai';
 
 const LLM_PROVIDER = process.env.LLM_PROVIDER || 'openai';
 const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
-const LLM_API_KEY = process.env.LLM_API_KEY;
 const LLM_BASE_URL = process.env.LLM_BASE_URL;
 const LLM_CUSTOM_PROVIDER = process.env.LLM_CUSTOM_PROVIDER || 'openai'; // 自定义 BASE_URL 时的提供商
 
@@ -177,8 +176,6 @@ app.get('/api/config', (req, res) => {
         config: {
             appId: process.env.VOLC_APP_ID || '',
             aiMode: AI_MODE,
-            llmProvider: AI_MODE === 'custom' ? LLM_PROVIDER : 'N/A',
-            llmModel: AI_MODE === 'custom' ? LLM_MODEL : 'N/A',
             volcConfigured: !!(process.env.VOLC_APP_ID && process.env.VOLC_APP_KEY),
             rtcConfigured: !!(process.env.VOLC_APP_ID && process.env.VOLC_APP_KEY),
             authEnabled: true
@@ -194,8 +191,6 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString(),
         config: {
             aiMode: AI_MODE,
-            llmProvider: AI_MODE === 'custom' ? LLM_PROVIDER : 'N/A',
-            llmModel: AI_MODE === 'custom' ? LLM_MODEL : 'N/A',
             volcConfigured: !!(process.env.VOLC_ACCESS_KEY && process.env.VOLC_SECRET_KEY),
             rtcConfigured: !!(process.env.VOLC_APP_ID && process.env.VOLC_APP_KEY),
             authEnabled: true
@@ -225,17 +220,16 @@ app.post('/v1/chat/completions', async (req, res) => {
     
     // 记录请求
     console.log(`\n📥 [${requestId}] POST /v1/chat/completions`);
-    console.log(`   SessionId: ${req.body.session_id || 'default'}`);
+    console.log(`   SessionId: ${req.query.session_id || 'N/A'}`);
     console.log(`   Stream: ${req.body.stream || false}`);
     console.log(`   Messages:`, JSON.stringify(req.body.messages, null, 2));
     
     const {
         messages = [],
-        stream = false,
-        session_id = 'default'
+        stream = false
     } = req.body;
     
-    const sessionId = session_id || `session_${Date.now()}`;
+    const sessionId = req.query.session_id || `session_${Date.now()}`;
     const agent = getOrCreateAgent(sessionId);
     
     const startTime = Date.now();
@@ -411,7 +405,7 @@ app.get('/api/characters', (req, res) => {
 
 // ==================== 获取 Token ====================
 
-app.get('/api/token', optionalAuth, (req, res) => {
+app.get('/api/token', authMiddleware, (req, res) => {
     try {
         const { roomId, uid } = req.query;
         
@@ -503,19 +497,13 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             idleTimeout: 180
         });
     } else if (AI_MODE === 'custom') {
+        const customLlmUrl = process.env.PI_AGENT_URL + `?session_id=${sessionId}`;
         // Feature 配置（用于 HTTP 域名测试）
         const feature = process.env.PI_AGENT_FEATURE ? JSON.parse(process.env.PI_AGENT_FEATURE) : undefined;
         
         const config = getCustomLLMConfig({
-            customLlmUrl: process.env.PI_AGENT_URL || `http://localhost:${PORT}/v1/chat/completions`,
+            customLlmUrl,
             customLlmApiKey: process.env.PI_AGENT_API_KEY || 'pi-agent-secret-key',
-            customLlmModel: process.env.PI_AGENT_MODEL || LLM_MODEL,
-            systemPrompt: combinedConfig.systemPrompt,
-            temperature: parseFloat(process.env.PI_AGENT_TEMPERATURE || '0.7'),
-            maxTokens: parseInt(process.env.PI_AGENT_MAX_TOKENS || '500'),
-            topP: parseFloat(process.env.PI_AGENT_TOP_P || '0.9'),
-            historyLength: parseInt(process.env.PI_AGENT_HISTORY_LENGTH || '3'),
-            sessionId, // 传递 sessionId 给 pi-agent（放在 LLMConfig 里）
             feature, // Feature 参数，例如 {Http: true}
             asrAppId: process.env.VOLC_ASR_APP_ID,
             asrToken: process.env.VOLC_ASR_TOKEN,
@@ -524,7 +512,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             ttsVoiceType: characterConfig.ttsVoiceType, // 使用角色配置的音色
             ttsResourceId: characterConfig.ttsResourceId, // 使用角色配置的 ResourceId（与音色匹配）
             asrResourceId: process.env.VOLC_ASR_RESOURCE_ID,
-            contextHistoryLength: 3
+            contextHistoryLength: 1
         });
         
         result = await client.startVoiceChatComponent({
@@ -555,6 +543,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             roomId,
             taskId,
             targetUserId,
+            agentUserId,
             s2sConfig: config,
             welcomeMessage: combinedConfig.welcomeMessage,
             idleTimeout: 180

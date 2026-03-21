@@ -10,9 +10,7 @@
  */
 
 import crypto from 'crypto';
-import { generateToken as generateOfficialToken } from './token-generator.js';
 import https from 'https';
-import { getScenePrompt } from './prompts.js';
 
 class VolcStartVoiceChatClient {
     constructor(options = {}) {
@@ -175,7 +173,8 @@ class VolcStartVoiceChatClient {
             Config: {
                 ASRConfig: config.asrConfig,
                 LLMConfig: config.llmConfig,
-                TTSConfig: config.ttsConfig
+                TTSConfig: config.ttsConfig,
+                SubtitleConfig: config.subtitleConfig                
             },
             AgentConfig: {
                 UserId: config.agentUserId || 'AIAssistant',
@@ -259,39 +258,6 @@ class VolcStartVoiceChatClient {
         console.log('✅ AI 对话已结束:', result);
         return result;
     }
-
-    /**
-     * 生成 RTC Token（用于客户端加入房间）
-     * 
-     * 参考官方文档：https://www.volcengine.com/docs/6348/70114
-     * 
-     * @param {string} roomId - 房间 ID
-     * @param {string} uid - 用户 ID
-     * @param {number} expireSeconds - 有效期（秒），默认 24 小时
-     * @returns {string} Base64 编码的 Token
-     */
-    generateToken(roomId, uid = 'client', expireSeconds = 86400) {
-        // 使用官方格式的 Token 生成器
-        return generateOfficialToken(
-            process.env.VOLC_APP_ID,
-            process.env.VOLC_APP_KEY,
-            roomId,
-            uid,
-            expireSeconds
-        );
-    }
-
-    /**
-     * 生成通配 Token（可以加入任意房间）
-     * 
-     * @param {string} uid - 用户 ID
-     * @param {number} expireSeconds - 有效期（秒）
-     * @returns {string} Base64 编码的通配 Token
-     */
-    generateWildcardToken(uid, expireSeconds = 86400) {
-        // 通配 Token 使用 "*" 作为 roomId
-        return this.generateToken('*', uid, expireSeconds);
-    }
 }
 
 // ============== 配置模板 ==============
@@ -310,12 +276,14 @@ function getComponentConfig(options = {}) {
                 AccessToken: options.asrToken,
                 ApiResourceId: options.asrResourceId || 'volc.bigasr.sauc.duration',
                 StreamMode: 2, // 双向流式优化版（兼顾实时与准确）
-                enable_nonstream: true, // 开启二遍识别，提升准确率
-                ContextHistoryLength: options.contextHistoryLength || 3
+                enable_nonstream: true // 开启二遍识别，提升准确率
             },
             VADConfig: {
                 SilenceTime: 600,
                 AIVAD: true
+            },
+            InterruptConfig: {
+                InterruptSpeechDuration: 1000 // 1 秒
             }
         },
         
@@ -329,8 +297,8 @@ function getComponentConfig(options = {}) {
             SystemMessages: [
                 options.systemPrompt || 'You are a friendly English teacher for kids. Speak in simple English.'
             ],
-            HistoryLength: 3,
-            Prefill: false
+            HistoryLength: options.contextHistoryLength,
+            Prefill: true
         },
         
         // TTS 配置 - 火山语音合成大模型
@@ -395,12 +363,6 @@ function getS2SConfig(options = {}) {
                     sample_rate: 24000
                 }
             }
-        },
-        
-        // 字幕配置 - 开启客户端字幕回调
-        SubtitleConfig: {
-            DisableRTSSubtitle: false, // 开启字幕
-            SubtitleMode: 1 // 1=LLM 原始回复（更快），0=TTS 对齐（更精准但慢）
         }
     };
 }
@@ -410,26 +372,6 @@ function getS2SConfig(options = {}) {
  * 用于接入 pi-agent-core 或其他第三方 Agent
  */
 function getCustomLLMConfig(options = {}) {
-    const {
-        customLlmUrl = 'http://localhost:3001/v1/chat/completions',
-        customLlmApiKey = 'pi-agent-secret-key',
-        customLlmModel = 'pi-agent-v1',
-        systemPrompt = 'You are a friendly English teacher for kids.',
-        temperature = 0.7,
-        maxTokens = 500,
-        topP = 0.9,
-        historyLength = 3,
-        sessionId = '', // 会话 ID，与 userId、character、scene 绑定
-        feature = undefined // Feature 参数，例如 {Http: true} 用于 HTTP 域名测试
-    } = options;
-    
-    // 构建 Custom 参数（JSON 字符串）
-    const customParams = {};
-    if (sessionId) {
-        customParams.SessionId = sessionId;
-    }
-    const customJson = Object.keys(customParams).length > 0 ? JSON.stringify(customParams) : undefined;
-    
     return {
         // ASR 配置 - 火山流式语音识别大模型（直传模式）
         ASRConfig: {
@@ -440,29 +382,25 @@ function getCustomLLMConfig(options = {}) {
                 AccessToken: options.asrToken,
                 ApiResourceId: options.asrResourceId || 'volc.bigasr.sauc.duration',
                 StreamMode: 2, // 双向流式优化版（兼顾实时与准确）
-                enable_nonstream: true, // 开启二遍识别，提升准确率
-                ContextHistoryLength: options.contextHistoryLength || historyLength
+                enable_nonstream: true // 开启二遍识别，提升准确率
             },
             VADConfig: {
                 SilenceTime: 600,
                 AIVAD: true
+            },
+            InterruptConfig: {
+                InterruptSpeechDuration: 1000 // 1 秒
             }
         },
         
         // LLM 配置 - 第三方 CustomLLM
         LLMConfig: {
             Mode: 'CustomLLM', // 固定值
-            Url: customLlmUrl, // 第三方服务地址
-            APIKey: customLlmApiKey, // 鉴权 Token
-            ModelName: customLlmModel, // 模型名称
-            Temperature: temperature,
-            MaxTokens: maxTokens,
-            TopP: topP,
-            SystemMessages: [systemPrompt],
-            HistoryLength: historyLength,
-            Prefill: false, // 是否开启预填充（降低延迟但增加调用次数）
-            Custom: customJson, // 自定义 JSON 参数（包含 SessionId）
-            Feature: feature ? JSON.stringify(feature) : undefined // Feature 参数，例如 {"Http":true}
+            Url: options.customLlmUrl, // 第三方服务地址
+            APIKey: options.customLlmApiKey, // 鉴权 Token
+            HistoryLength: options.contextHistoryLength,
+            Prefill: true, // 是否开启预填充（降低延迟但增加调用次数）
+            Feature: options.feature ? JSON.stringify(options.feature) : undefined // Feature 参数，例如 {"Http":true}
         },
         
         // TTS 配置 - 火山语音合成大模型
@@ -531,7 +469,7 @@ const S2SPreset = {
 /**
  * 角色基础配置（与 TTS 模型无关）
  */
-const CHARACTER_BASE_CONFIGS = {
+const CHARACTER_CONFIGS = {
     emma: {
         name: 'Miss Emma',
         systemPrompt: 'You are Miss Emma, a gentle English teacher for 5-year-old Chinese kids. Speak in simple English, use short sentences, encourage them to speak. Be warm and patient. Use emojis.',
@@ -591,10 +529,6 @@ const CHARACTER_BASE_CONFIGS = {
  * 
  * 注意：ResourceId 和 voice_type 需要匹配！
  * 不同 ResourceId 对应不同的音色集合。
- * 
- * 2026-03-21 更新：修复分组件模式音色引用
- * - tommy: zh_male_xiaotian_jupiter_bigtts → zh_male_linjiananhai_moon_bigtts (邻家男孩)
- * - mike: zh_male_yunzhou_jupiter_bigtts → zh_male_yangguangqingnian_moon_bigtts (阳光青年)
  */
 const TTS_VOICE_CONFIGS = {
     // 分组件模式音色映射 (ttsVoiceType + ttsResourceId)
@@ -654,7 +588,7 @@ const TTS_VOICE_CONFIGS = {
  * @returns {Object} 完整的角色配置
  */
 function getCharacterConfig(characterId, aiMode = 'component') {
-    const baseConfig = CHARACTER_BASE_CONFIGS[characterId];
+    const baseConfig = CHARACTER_CONFIGS[characterId];
     if (!baseConfig) {
         throw new Error(`Unknown character: ${characterId}`);
     }
@@ -682,91 +616,12 @@ function getCharacterConfig(characterId, aiMode = 'component') {
     }
 }
 
-/**
- * 合并角色和场景配置
- */
-function combineCharacterAndScenePrompt(characterConfig, sceneId) {
-    // 获取完整配置（兼容旧代码直接传入 characterConfig 的情况）
-    const config = typeof characterConfig === 'string' 
-        ? getCharacterConfig(characterConfig, process.env.AI_MODE || 'component')
-        : characterConfig;
-    
-    const sceneConfig = getScenePrompt(sceneId);
-    
-    return {
-        ...config,
-        systemPrompt: `${config.systemPrompt}\n\nScene: ${sceneConfig.name}. ${sceneConfig.description}`,
-        welcomeMessage: sceneConfig.welcomeMessage
-    };
-}
-
-// 向后兼容：保持 CHARACTER_CONFIGS 导出（使用默认 component 模式）
-const CHARACTER_CONFIGS = CHARACTER_BASE_CONFIGS;
-
-// ============== 测试 ==============
-
-async function test() {
-    console.log('🧪 Testing VolcStartVoiceChatClient...\n');
-    
-    const client = new VolcStartVoiceChatClient({
-        accessKey: process.env.VOLC_ACCESS_KEY,
-        secretKey: process.env.VOLC_SECRET_KEY
-    });
-    
-    // 测试 Token 生成
-    try {
-        const token = client.generateToken('test_room', 'test_user');
-        console.log('✅ Token generated:', token.substring(0, 50) + '...\n');
-    } catch (e) {
-        console.log('⚠️ Token generation skipped (credentials not set)\n');
-    }
-    
-    // 测试配置生成
-    const componentConfig = getComponentConfig({
-        asrAppId: 'xxx',
-        asrToken: 'xxx',
-        llmEndpointId: 'ep-xxx',
-        ttsAppId: 'xxx',
-        ttsToken: 'xxx',
-        systemPrompt: 'Test prompt'
-    });
-    console.log('✅ Component config generated');
-    console.log('   ASR Provider:', componentConfig.ASRConfig.Provider);
-    console.log('   LLM Mode:', componentConfig.LLMConfig.Mode);
-    console.log('   TTS Provider:', componentConfig.TTSConfig.Provider);
-    
-    const s2sConfig = getS2SConfig({
-        s2sAppId: 'xxx',
-        s2sToken: 'xxx',
-        systemRole: 'Test role'
-    });
-    console.log('\n✅ S2S config generated');
-    console.log('   Provider:', s2sConfig.Provider);
-    console.log('   OutputMode:', s2sConfig.OutputMode);
-    
-    console.log('\n📝 Client ready!');
-    console.log('   - startVoiceChatComponent() - 分组件模式');
-    console.log('   - startVoiceChatS2S() - 端到端模式');
-    console.log('   - stopVoiceChat() - 结束对话');
-}
-
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-if (process.argv[1] === __filename) {
-    test().catch(console.error);
-}
-
 export {
     VolcStartVoiceChatClient,
     getComponentConfig,
     getS2SConfig,
     getCustomLLMConfig,
     CHARACTER_CONFIGS,
-    CHARACTER_BASE_CONFIGS,
     TTS_VOICE_CONFIGS,
-    getCharacterConfig,
-    combineCharacterAndScenePrompt,
-    test
+    getCharacterConfig
 };

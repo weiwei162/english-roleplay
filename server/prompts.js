@@ -199,11 +199,9 @@ ${scenePrompt.systemPrompt}`;
     const combinedSystemRole = `${characterConfig.systemRole} You are at ${scenePrompt.name}.`;
     
     return {
+        ...characterConfig,
         systemPrompt: combinedSystemPrompt,
         systemRole: combinedSystemRole,
-        speakingStyle: characterConfig.speakingStyle,
-        ttsVoiceType: characterConfig.ttsVoiceType,
-        s2sSpeaker: characterConfig.s2sSpeaker,
         vocabulary: scenePrompt.vocabulary,
         patterns: scenePrompt.patterns,
         welcomeMessage: scenePrompt.welcomeMessage
