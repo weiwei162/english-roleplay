@@ -176,13 +176,12 @@ h1 {
 
 .character-sprite {
     position: absolute;
-    transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    animation: characterFloat 3s ease-in-out infinite;
-}
-
-@keyframes characterFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+    transition: left 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                top 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    /* 移除浮动动画，避免与 transform 冲突导致位置偏移 */
+    /* 使用 margin 居中而不是 transform */
+    margin-left: -80px;  /* 约等于角色宽度的一半 */
+    margin-top: -80px;   /* 约等于角色高度的一半 */
 }
 
 .character-body {

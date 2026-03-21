@@ -12,6 +12,14 @@ let audioContext = null;
 // ⚠️ 语音识别已移除：StartVoiceChat 模式下不需要
 // 火山引擎云端自动处理 ASR 语音识别
 
+// ============== 初始化检查 ==============
+console.log('🔍 [Init] Checking global objects:');
+console.log('   window.Character:', window.Character);
+console.log('   window.Particles:', window.Particles);
+console.log('   Character.playRandom:', window.Character?.playRandom);
+console.log('   Particles.spawn:', window.Particles?.spawn);
+console.log('   [Init] Check complete');
+
 // 音效系统
 function initAudio() {
     if (!audioContext) {
@@ -189,6 +197,10 @@ async function selectCharacter(charId) {
     
     currentCharacter = getCharacter(charId);
     
+    // 重置 AI 说话计数器
+    aiSpeakCount = 0;
+    console.log('🔄 [Reset] aiSpeakCount reset to 0');
+    
     document.getElementById('current-avatar').textContent = currentCharacter.avatar;
     document.getElementById('current-char-name').textContent = currentCharacter.name;
     
@@ -252,7 +264,11 @@ let aiSpeakCount = 0; // AI 说话次数计数器
 
 function handleAISubtitle(subtitle) {
     // 调试日志
-    console.log('💬 [Subtitle] Received:', subtitle);
+    console.log('💬 [Subtitle] Received:', {
+        hasSubtitle: !!subtitle,
+        dataLength: subtitle?.data?.length,
+        data: subtitle?.data?.slice(0, 2)  // 只显示前 2 条
+    });
     
     if (!subtitle || !subtitle.data || !Array.isArray(subtitle.data)) {
         console.warn('⚠️ [Subtitle] Invalid format:', subtitle);
@@ -262,6 +278,8 @@ function handleAISubtitle(subtitle) {
     // 遍历字幕数据（可能有多条）
     for (const item of subtitle.data) {
         const { text, userId } = item;
+        
+        console.log('📝 [Subtitle] Item:', { text: text?.substring(0, 30), userId });
         
         // 只处理 AI 的字幕（userId 以 ai_ 开头）
         if (!userId || !userId.startsWith('ai_')) {
@@ -274,17 +292,30 @@ function handleAISubtitle(subtitle) {
             aiSpeakCount++;
             
             console.log(`🤖 AI spoke #${aiSpeakCount}: "${text.substring(0, 50)}..."`);
+            console.log('   [Character] Available:', !!window.Character);
+            console.log('   [Particles] Available:', !!window.Particles);
             
             // 1. 让角色在不同位置之间循环移动
             moveCharacterRandomly(aiSpeakCount);
             
             // 2. 播放随机肢体动作
-            Character.playRandom();
+            console.log('🎭 [Character] Playing random animation');
+            if (window.Character && typeof Character.playRandom === 'function') {
+                Character.playRandom();
+            } else {
+                console.warn('⚠️ Character.playRandom not available');
+            }
             
             // 3. 每 5 次播放粒子效果
             if (aiSpeakCount % 5 === 0) {
                 console.log('✨ Spawning celebrate particles');
-                Particles.spawn('celebrate', { canvas: document.getElementById('canvas') });
+                const canvas = document.getElementById('canvas');
+                console.log('   Canvas:', canvas);
+                if (window.Particles && typeof Particles.spawn === 'function' && canvas) {
+                    Particles.spawn('celebrate', { canvas });
+                } else {
+                    console.warn('⚠️ Particles.spawn not available or no canvas');
+                }
             }
         }
     }
@@ -555,7 +586,14 @@ function clearCanvasContent() {
 // 移动角色到指定位置
 function moveCharacterTo(x, y, options = {}) {
     const sprite = document.getElementById('character-sprite');
-    if (!sprite) return;
+    if (!sprite) {
+        console.error('❌ [Move] Sprite not found!');
+        return;
+    }
+    
+    console.log('🚶 [Move] Moving to:', { x, y, options });
+    console.log('   Current position:', characterPosition);
+    console.log('   Sprite style before:', { left: sprite.style.left, top: sprite.style.top });
     
     initAudio();
     
@@ -564,10 +602,14 @@ function moveCharacterTo(x, y, options = {}) {
     
     // 跳跃时播放灰尘粒子效果
     if (options.jump) {
-        Particles.spawn('dust', { 
-            x: characterPosition.x * window.innerWidth / 100,
-            y: characterPosition.y * window.innerHeight / 100
-        });
+        console.log('✨ [Move] Spawning dust particles');
+        const canvas = document.getElementById('canvas');
+        if (window.Particles && typeof Particles.spawn === 'function' && canvas) {
+            Particles.spawn('dust', { 
+                x: characterPosition.x * window.innerWidth / 100,
+                y: characterPosition.y * window.innerHeight / 100
+            });
+        }
     }
     
     // 播放脚步声
@@ -581,13 +623,16 @@ function moveCharacterTo(x, y, options = {}) {
         }
     }, 200);
     
-    // 设置新位置
+    // 设置新位置（不使用 transform，避免与 CSS 冲突）
     sprite.style.left = x + '%';
     sprite.style.top = y + '%';
-    sprite.style.transform = 'translate(-50%, -50%)';
+    // 移除 transform 设置，让 CSS 控制居中
     
     // 更新位置记录
     characterPosition = { x, y };
+    
+    console.log('   Sprite style after:', { left: sprite.style.left, top: sprite.style.top });
+    console.log('   New position:', characterPosition);
     
     // 移除行走动画
     setTimeout(() => {
