@@ -179,9 +179,8 @@ h1 {
     transition: left 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55),
                 top 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     /* 移除浮动动画，避免与 transform 冲突导致位置偏移 */
-    /* 使用 margin 居中而不是 transform */
-    margin-left: -80px;  /* 约等于角色宽度的一半 */
-    margin-top: -80px;   /* 约等于角色高度的一半 */
+    /* 使用 transform 居中（只在初始化时使用，后续位置由 left/top 控制） */
+    transform: translate(-50%, -50%);
 }
 
 .character-body {

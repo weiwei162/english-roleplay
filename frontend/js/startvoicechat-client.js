@@ -677,6 +677,9 @@ async function createStartVoiceChatRoom(roomId, options = {}) {
         }),
         onRemoteStream: options.onRemoteStream || ((stream) => {
             console.log('📥 Remote stream:', stream);
+        }),
+        onSubtitle: options.onSubtitle || ((subtitle) => {
+            console.log('💬 [Client] Subtitle received:', subtitle);
         })
     });
     

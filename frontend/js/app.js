@@ -443,7 +443,7 @@ async function createAIVoiceChatRoom() {
                 
                 // 字幕回调 - AI 说话时触发
                 onSubtitle: (subtitle) => {
-                    console.log('💬 Subtitle received:', subtitle);
+                    console.log('💬 [App] Subtitle callback triggered:', subtitle);
                     handleAISubtitle(subtitle);
                 }
             }
@@ -623,10 +623,10 @@ function moveCharacterTo(x, y, options = {}) {
         }
     }, 200);
     
-    // 设置新位置（不使用 transform，避免与 CSS 冲突）
+    // 设置新位置
     sprite.style.left = x + '%';
     sprite.style.top = y + '%';
-    // 移除 transform 设置，让 CSS 控制居中
+    // CSS 已设置 transform: translate(-50%, -50%) 用于居中
     
     // 更新位置记录
     characterPosition = { x, y };
