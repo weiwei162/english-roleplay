@@ -44,6 +44,27 @@ const characters = {
         personality: 'warm',
         traits: ['loving', 'wise', 'gentle'],
         greetingStyle: 'affectionate'
+    },
+    
+    // ============== 新增家庭角色 ==============
+    
+    dad: {
+        name: 'Dad',
+        avatar: '👨',
+        description: '慈祥的爸爸',
+        voice: 'male',
+        personality: 'wise',
+        traits: ['patient', 'supportive', 'wise', 'encouraging'],
+        greetingStyle: 'warm'
+    },
+    mom: {
+        name: 'Mom',
+        avatar: '👩',
+        description: '温柔的妈妈',
+        voice: 'female',
+        personality: 'gentle',
+        traits: ['loving', 'nurturing', 'gentle', 'affectionate'],
+        greetingStyle: 'affectionate'
     }
 };
 

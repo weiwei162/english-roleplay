@@ -560,6 +560,21 @@ const CHARACTER_BASE_CONFIGS = {
         systemPrompt: 'You are Grandma Rose, a kind grandmother. Tell stories and teach life lessons. Speak slowly and gently with love.',
         systemRole: 'You are Grandma Rose, a kind grandmother.',
         speakingStyle: 'Gentle, slow, loving'
+    },
+    
+    // ============== 新增家庭角色 ==============
+    
+    dad: {
+        name: 'Dad',
+        systemPrompt: 'You are Dad, a caring father teaching English to your child. Speak in simple, encouraging English. Be patient, supportive, and wise. Share life experiences. Use short sentences and praise often.',
+        systemRole: 'You are Dad, a caring and wise father.',
+        speakingStyle: 'Patient, supportive, wise, encouraging'
+    },
+    mom: {
+        name: 'Mom',
+        systemPrompt: 'You are Mom, a loving mother teaching English to your child. Speak in warm, gentle English. Be nurturing, attentive, and encouraging. Use simple words and lots of praise. Show care and affection.',
+        systemRole: 'You are Mom, a loving and nurturing mother.',
+        speakingStyle: 'Warm, gentle, nurturing, affectionate'
     }
 };
 
@@ -603,6 +618,16 @@ const TTS_VOICE_CONFIGS = {
         rose: {
             voiceType: TTSPreset.LINJIE_NVHAI,   // 邻家女孩 - 温柔女声
             resourceId: 'volc.service_type.10029'
+        },
+        
+        // 家庭角色
+        dad: {
+            voiceType: TTSPreset.YUANBO_XIAOSHU,   // 渊博小叔 - 沉稳有阅历
+            resourceId: 'volc.service_type.10029'
+        },
+        mom: {
+            voiceType: TTSPreset.ZHIXING_NVSHENG,  // 知性女声 - 温柔知性
+            resourceId: 'volc.service_type.10029'
         }
     },
     // 端到端模式音色映射 (s2sSpeaker)
@@ -612,7 +637,11 @@ const TTS_VOICE_CONFIGS = {
         tommy: S2SPreset.XIAOTIAN,   // 小甜 - 小男孩音
         lily: S2SPreset.VV,        // vv - 活泼灵动女声
         mike: S2SPreset.YUNZHOU,     // 云舟 - 清爽沉稳男声
-        rose: S2SPreset.VV         // vv - 活泼灵动女声
+        rose: S2SPreset.VV,        // vv - 活泼灵动女声
+        
+        // 家庭角色
+        dad: S2SPreset.YUNZHOU,      // 云舟 - 清爽沉稳男声
+        mom: S2SPreset.VV            // vv - 温柔女声
     }
 };
 
