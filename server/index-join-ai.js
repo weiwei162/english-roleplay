@@ -141,11 +141,16 @@ const TOOLS = [dictionaryTool, pronunciationTool];
 // Agent 会话管理
 const piAgents = new Map();
 
-function getOrCreateAgent(sessionId) {
+/**
+ * 获取或创建 Agent 实例
+ * @param {string} sessionId - 会话 ID
+ * @param {string} systemPrompt - 系统提示词（根据角色和场景动态生成）
+ */
+function getOrCreateAgent(sessionId, systemPrompt) {
     if (!piAgents.has(sessionId)) {
         const agent = new Agent({
             initialState: {
-                systemPrompt: TEACHER_SYSTEM_PROMPT,
+                systemPrompt: systemPrompt || TEACHER_SYSTEM_PROMPT,
                 model: getLLMModel(),
                 thinkingLevel: 'off',
                 tools: TOOLS,
@@ -153,6 +158,12 @@ function getOrCreateAgent(sessionId) {
             }
         });
         piAgents.set(sessionId, agent);
+    } else {
+        // 更新已有 Agent 的 systemPrompt（如果提供了新的）
+        if (systemPrompt) {
+            const agent = piAgents.get(sessionId);
+            agent.state.systemPrompt = systemPrompt;
+        }
     }
     return piAgents.get(sessionId);
 }
@@ -230,7 +241,27 @@ app.post('/v1/chat/completions', async (req, res) => {
     } = req.body;
     
     const sessionId = req.query.session_id || `session_${Date.now()}`;
-    const agent = getOrCreateAgent(sessionId);
+    
+    // 从 sessionId 解析角色和场景信息
+    // sessionId 格式：session_{userId}_{character}_{sceneId}_{timestamp}
+    let systemPrompt = TEACHER_SYSTEM_PROMPT;
+    const sessionParts = sessionId.split('_');
+    if (sessionParts.length >= 4) {
+        const character = sessionParts[2];
+        const sceneId = sessionParts[3];
+        
+        // 获取角色和场景配置
+        try {
+            const characterConfig = getCharacterConfig(character, 'component');
+            const combinedConfig = combineCharacterAndScenePrompt(characterConfig, sceneId);
+            systemPrompt = combinedConfig.systemPrompt;
+            console.log(`📝 [${requestId}] Using dynamic systemPrompt for character=${character}, scene=${sceneId}`);
+        } catch (error) {
+            console.warn(`⚠️ [${requestId}] Failed to get dynamic systemPrompt, using default:`, error.message);
+        }
+    }
+    
+    const agent = getOrCreateAgent(sessionId, systemPrompt);
     
     const startTime = Date.now();
     
