@@ -12,6 +12,7 @@
 import crypto from 'crypto';
 import { generateToken as generateOfficialToken } from './token-generator.js';
 import https from 'https';
+import { getScenePrompt } from './prompts.js';
 
 class VolcStartVoiceChatClient {
     constructor(options = {}) {
