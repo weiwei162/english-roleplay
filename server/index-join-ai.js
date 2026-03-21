@@ -18,7 +18,6 @@ import https from 'https';
 import http from 'http';
 import { fileURLToPath } from 'url';
 import { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLMConfig, CHARACTER_CONFIGS, getCharacterConfig, combineCharacterAndScenePrompt } from './volc-start-voicechat.js';
-import { getScenePrompt } from './prompts.js';
 import { generateToken, generateWildcardToken, verifyToken } from './token-generator.js';
 import { register, login, authMiddleware, optionalAuth } from './auth.js';
 import 'dotenv/config';
@@ -473,7 +472,6 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
     // 根据 AI 模式获取角色配置（自动选择正确的 TTS 音色）
     const characterConfig = getCharacterConfig(character, AI_MODE);
     const combinedConfig = combineCharacterAndScenePrompt(characterConfig, sceneId);
-    const sceneConfig = getScenePrompt(sceneId);
     const taskId = `task_${roomId}_${Date.now()}`;
     
     let result;
@@ -501,7 +499,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             asrConfig: config.ASRConfig,
             llmConfig: config.LLMConfig,
             ttsConfig: config.TTSConfig,
-            welcomeMessage: sceneConfig.welcomeMessage,
+            welcomeMessage: combinedConfig.welcomeMessage,
             idleTimeout: 180
         });
     } else if (AI_MODE === 'custom') {
@@ -538,7 +536,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             asrConfig: config.ASRConfig,
             llmConfig: config.LLMConfig,
             ttsConfig: config.TTSConfig,
-            welcomeMessage: sceneConfig.welcomeMessage,
+            welcomeMessage: combinedConfig.welcomeMessage,
             idleTimeout: 180
         });
     } else if (AI_MODE === 's2s') {
@@ -558,7 +556,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             taskId,
             targetUserId,
             s2sConfig: config,
-            welcomeMessage: sceneConfig.welcomeMessage,
+            welcomeMessage: combinedConfig.welcomeMessage,
             idleTimeout: 180
         });
     }
