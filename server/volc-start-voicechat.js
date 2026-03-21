@@ -492,6 +492,39 @@ function getCustomLLMConfig(options = {}) {
     };
 }
 
+// ============== 音色常量定义 ==============
+
+/**
+ * TTS 音色预设（分组件模式）
+ * 参考：豆包语音合成模型 1.0 官方音色列表
+ */
+const TTSPreset = {
+    // 通用场景 - 女声
+    LINJIE_NVHAI: 'zh_female_linjianvhai_moon_bigtts',      // 邻家女孩（默认）
+    MEILI_NVYOU: 'zh_female_meilinvyou_moon_bigtts',        // 魅力女友
+    TIANMEI_TAOZI: 'zh_female_tianmeitaozi_mars_bigtts',    // 甜美桃子
+    QINGXIN_NVSHENG: 'zh_female_qingxinnvsheng_mars_bigtts',  // 清新女声
+    ZHIXING_NVSHENG: 'zh_female_zhixingnvsheng_mars_bigtts',  // 知性女声
+    KAILANG_JIEJIE: 'zh_female_kailangjiejie_moon_bigtts',  // 开朗姐姐
+    
+    // 通用场景 - 男声
+    YANGGUANG_QINGNIAN: 'zh_male_yangguangqingnian_moon_bigtts',  // 阳光青年
+    QINGSHUANG_NANDA: 'zh_male_qingshuangnanda_mars_bigtts',      // 清爽男大
+    YUANBO_XIAOSHU: 'zh_male_yuanboxiaoshu_moon_bigtts',          // 渊博小叔
+    JIESHUO_XIAOMING: 'zh_male_jieshuoxiaoming_moon_bigtts',      // 解说小明
+    LINJIE_NANHAI: 'zh_male_linjiananhai_moon_bigtts',            // 邻家男孩
+};
+
+/**
+ * S2S 音色预设（端到端模式）
+ */
+const S2SPreset = {
+    VV: 'zh_female_vv_jupiter_bigtts',           // vv（默认）
+    XIAOHE: 'zh_female_xiaohe_jupiter_bigtts',   // 小何
+    YUNZHOU: 'zh_male_yunzhou_jupiter_bigtts',   // 云舟
+    XIAOTIAN: 'zh_male_xiaotian_jupiter_bigtts', // 小甜
+};
+
 // ============== 角色人设 ==============
 
 /**
@@ -542,40 +575,44 @@ const CHARACTER_BASE_CONFIGS = {
  * 
  * 注意：ResourceId 和 voice_type 需要匹配！
  * 不同 ResourceId 对应不同的音色集合。
+ * 
+ * 2026-03-21 更新：修复分组件模式音色引用
+ * - tommy: zh_male_xiaotian_jupiter_bigtts → zh_male_linjiananhai_moon_bigtts (邻家男孩)
+ * - mike: zh_male_yunzhou_jupiter_bigtts → zh_male_yangguangqingnian_moon_bigtts (阳光青年)
  */
 const TTS_VOICE_CONFIGS = {
     // 分组件模式音色映射 (ttsVoiceType + ttsResourceId)
     // ResourceId: volc.service_type.10029 (语音合成大模型)
     component: {
         emma: {
-            voiceType: 'zh_female_linjianvhai_moon_bigtts',  // 温柔女声（月亮姐姐）
+            voiceType: TTSPreset.LINJIE_NVHAI,  // 邻家女孩 - 温柔女声
             resourceId: 'volc.service_type.10029'
         },
         tommy: {
-            voiceType: 'zh_male_xiaotian_jupiter_bigtts',   // 小男孩（小天）
+            voiceType: TTSPreset.LINJIE_NANHAI,   // 邻家男孩 - 少年音
             resourceId: 'volc.service_type.10029'
         },
         lily: {
-            voiceType: 'zh_female_linjianvhai_moon_bigtts',  // 清新女声（月亮姐姐）
+            voiceType: TTSPreset.LINJIE_NVHAI,  // 邻家女孩 - 清新女声
             resourceId: 'volc.service_type.10029'
         },
         mike: {
-            voiceType: 'zh_male_yunzhou_jupiter_bigtts',     // 运动男声（云舟）
+            voiceType: TTSPreset.YANGGUANG_QINGNIAN, // 阳光青年 - 活力男声
             resourceId: 'volc.service_type.10029'
         },
         rose: {
-            voiceType: 'zh_female_linjianvhai_moon_bigtts',   // 温柔女声（月亮姐姐）
+            voiceType: TTSPreset.LINJIE_NVHAI,   // 邻家女孩 - 温柔女声
             resourceId: 'volc.service_type.10029'
         }
     },
     // 端到端模式音色映射 (s2sSpeaker)
     // S2S 模式下 ResourceId 由模型版本决定，不需要单独配置
     s2s: {
-        emma: 'zh_female_vv_jupiter_bigtts',        // 通用女声
-        tommy: 'zh_male_xiaotian_jupiter_bigtts',   // 小男孩
-        lily: 'zh_female_vv_jupiter_bigtts',        // 通用女声
-        mike: 'zh_male_yunzhou_jupiter_bigtts',     // 运动男声
-        rose: 'zh_female_vv_jupiter_bigtts'         // 通用女声
+        emma: S2SPreset.VV,        // vv - 活泼灵动女声
+        tommy: S2SPreset.XIAOTIAN,   // 小甜 - 小男孩音
+        lily: S2SPreset.VV,        // vv - 活泼灵动女声
+        mike: S2SPreset.YUNZHOU,     // 云舟 - 清爽沉稳男声
+        rose: S2SPreset.VV         // vv - 活泼灵动女声
     }
 };
 
