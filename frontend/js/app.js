@@ -223,6 +223,15 @@ function handleCharacterClick() {
     sprite.classList.add('clapping');
     setTimeout(() => sprite.classList.remove('clapping'), 1000);
     
+    // 🎭 播放肢体动作
+    Character.playAnimation('wave');
+    
+    // ✨ 播放爱心粒子
+    Particles.spawn('hearts', { 
+        x: characterPosition.x * window.innerWidth / 100,
+        y: characterPosition.y * window.innerHeight / 100
+    });
+    
     // 随机回应（语音播放，不显示气泡）
     const responses = [
         "Hehe! You're so funny!",
@@ -242,23 +251,41 @@ function handleCharacterClick() {
 let aiSpeakCount = 0; // AI 说话次数计数器
 
 function handleAISubtitle(subtitle) {
-    if (!subtitle || !subtitle.data || !Array.isArray(subtitle.data)) return;
+    // 调试日志
+    console.log('💬 [Subtitle] Received:', subtitle);
+    
+    if (!subtitle || !subtitle.data || !Array.isArray(subtitle.data)) {
+        console.warn('⚠️ [Subtitle] Invalid format:', subtitle);
+        return;
+    }
     
     // 遍历字幕数据（可能有多条）
     for (const item of subtitle.data) {
-        const { text, userId, paragraph, definite } = item;
+        const { text, userId } = item;
         
         // 只处理 AI 的字幕（userId 以 ai_ 开头）
-        if (!userId || !userId.startsWith('ai_')) continue;
+        if (!userId || !userId.startsWith('ai_')) {
+            console.log('⏭️ [Subtitle] Not AI:', userId);
+            continue;
+        }
         
-        // 当 AI 说完完整一句话时，让角色移动一下
-        if (paragraph && definite) {
+        // 有文本就触发效果（放宽条件）
+        if (text) {
             aiSpeakCount++;
             
-            console.log(`🤖 AI spoke #${aiSpeakCount}:`, text);
+            console.log(`🤖 AI spoke #${aiSpeakCount}: "${text.substring(0, 50)}..."`);
             
-            // 让角色在不同位置之间循环移动
+            // 1. 让角色在不同位置之间循环移动
             moveCharacterRandomly(aiSpeakCount);
+            
+            // 2. 播放随机肢体动作
+            Character.playRandom();
+            
+            // 3. 每 5 次播放粒子效果
+            if (aiSpeakCount % 5 === 0) {
+                console.log('✨ Spawning celebrate particles');
+                Particles.spawn('celebrate', { canvas: document.getElementById('canvas') });
+            }
         }
     }
 }
@@ -412,6 +439,14 @@ async function joinAIWithCharacter(character, scene) {
     try {
         await joinAICharacter(character, sceneId);
         console.log('✅ AI character joined');
+        
+        // 🎉 播放欢迎效果（延迟 1 秒，等待 AI 准备好）
+        setTimeout(() => {
+            console.log('✨ Playing welcome effects');
+            Particles.spawn('celebrate', { canvas: document.getElementById('canvas') });
+            Character.playAnimation('wave');
+        }, 1000);
+        
     } catch (error) {
         console.error('❌ Failed to join AI:', error);
         showVideoError(error.message);
@@ -526,6 +561,14 @@ function moveCharacterTo(x, y, options = {}) {
     
     // 添加行走动画
     sprite.classList.add('walking');
+    
+    // 跳跃时播放灰尘粒子效果
+    if (options.jump) {
+        Particles.spawn('dust', { 
+            x: characterPosition.x * window.innerWidth / 100,
+            y: characterPosition.y * window.innerHeight / 100
+        });
+    }
     
     // 播放脚步声
     let stepCount = 0;
