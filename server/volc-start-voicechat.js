@@ -623,8 +623,8 @@ const TTS_VOICE_CONFIGS = {
         
         // 家庭角色
         dad: {
-            voiceType: TTSPreset.YUANBO_XIAOSHU,   // 渊博小叔 - 沉稳有阅历
-            resourceId: 'volc.service_type.10029'
+            voiceType: 'S_y6tmplBW1',   // 自定义音色 - 爸爸专属
+            resourceId: 'seed-icl-2.0'  // 2.0 版本资源
         },
         mom: {
             voiceType: TTSPreset.ZHIXING_NVSHENG,  // 知性女声 - 温柔知性
