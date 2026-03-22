@@ -238,7 +238,69 @@ const showImageTool = {
     }
 };
 
-const TOOLS = [dictionaryTool, pronunciationTool, showImageTool];
+// Unsplash 图片搜索工具
+const unsplashSearchTool = {
+    name: 'unsplash_search',
+    description: 'Search and display a real photo from Unsplash (e.g., animals, places, objects)',
+    parameters: {
+        type: 'object',
+        properties: {
+            query: { type: 'string', description: 'Search query in English, e.g., "lion", "apple", "park"' },
+            orientation: { type: 'string', description: 'Image orientation', enum: ['landscape', 'portrait', 'squarish'] }
+        },
+        required: ['query']
+    },
+    execute: async ({ query, orientation = 'landscape' }, { sessionId }) => {
+        const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+        const unsplashUrl = process.env.UNSPLASH_API_URL || 'https://api.unsplash.com';
+        
+        let imageUrl = null;
+        let photographer = 'Unknown';
+        
+        // 如果配置了 Unsplash API Key，调用真实 API
+        if (unsplashKey) {
+            try {
+                const searchUrl = `${unsplashUrl}/search/photos?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=1&client_id=${unsplashKey}`;
+                const response = await fetch(searchUrl);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.results && data.results.length > 0) {
+                        const img = data.results[0];
+                        imageUrl = img.urls.regular || img.urls.small || img.urls.thumb;
+                        photographer = img.user?.name || 'Unknown';
+                        
+                        console.log(`🖼️ Unsplash search: "${query}" → ${imageUrl}`);
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Unsplash API error:', error.message);
+            }
+        }
+        
+        // 如果没有配置 API Key 或 API 调用失败，使用 Picsum 随机图片
+        if (!imageUrl) {
+            const seed = encodeURIComponent(query.toLowerCase());
+            imageUrl = `https://picsum.photos/seed/${seed}/800/600`;
+            console.log(`🖼️ Using Picsum fallback for: "${query}"`);
+        }
+        
+        // 通过 WebSocket 发送图片到前端
+        const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
+        if (roomInfo) {
+            sendToolCallToClient(roomInfo[0], {
+                type: 'showImage',
+                url: imageUrl,
+                caption: query,
+                photographer
+            });
+        }
+        
+        return `Look at this ${query}!`;
+    }
+};
+
+const TOOLS = [dictionaryTool, pronunciationTool, showImageTool, unsplashSearchTool];
 
 // Agent 会话管理
 const piAgents = new Map();

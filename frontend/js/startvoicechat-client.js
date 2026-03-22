@@ -283,6 +283,9 @@ class StartVoiceChatClient {
         } else if (toolCall.type === 'showStars') {
             // 显示星星动画
             this.showStars(toolCall.count);
+        } else if (toolCall.type === 'showImage') {
+            // 显示 Unsplash 图片
+            this.showUnsplashImage(toolCall.url, toolCall.caption, toolCall.photographer);
         }
     }
 
@@ -311,6 +314,51 @@ class StartVoiceChatClient {
         canvas.appendChild(starsEl);
         
         setTimeout(() => starsEl.remove(), 2000);
+    }
+
+    /**
+     * 显示 Unsplash 图片
+     */
+    showUnsplashImage(url, caption, photographer) {
+        const canvas = document.getElementById('canvas');
+        
+        // 创建图片容器
+        const imgContainer = document.createElement('div');
+        imgContainer.className = 'unsplash-image-container';
+        
+        // 创建图片元素
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = caption || 'Image';
+        img.className = 'unsplash-image';
+        
+        // 创建标题
+        if (caption) {
+            const captionEl = document.createElement('div');
+            captionEl.className = 'unsplash-caption';
+            captionEl.textContent = caption;
+            imgContainer.appendChild(captionEl);
+        }
+        
+        // 创建摄影师信息
+        if (photographer && photographer !== 'Unknown') {
+            const photoEl = document.createElement('div');
+            photoEl.className = 'unsplash-photo-credit';
+            photoEl.textContent = `📷 ${photographer}`;
+            imgContainer.appendChild(photoEl);
+        }
+        
+        // 创建关闭按钮
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'unsplash-close';
+        closeBtn.textContent = '✕';
+        closeBtn.onclick = () => imgContainer.remove();
+        
+        imgContainer.appendChild(img);
+        imgContainer.appendChild(closeBtn);
+        canvas.appendChild(imgContainer);
+        
+        console.log('🖼️ Image displayed:', url);
     }
 
     /**
