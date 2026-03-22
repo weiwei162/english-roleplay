@@ -173,16 +173,19 @@ const dictionaryTool = {
             'banana': 'A yellow curved fruit. Monkeys love it! 🍌'
         };
         
-        // 通过 WebSocket 发送 emoji 到前端
+        const definition = definitions[word.toLowerCase()] || 'A special word!';
+        const emoji = definition.split(' ').pop();
+        
+        // 可选：通过 WebSocket 发送 emoji 到前端（工具自己决定）
         const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-        if (roomInfo) {
+        if (roomInfo && emoji) {
             sendToolCallToClient(roomInfo[0], {
                 type: 'showEmoji',
-                emoji: definitions[word.toLowerCase()]?.split(' ').pop() || '📖'
+                emoji
             });
         }
         
-        return { word, definition: definitions[word.toLowerCase()] || 'A special word!', example: `Example: "The ${word} is fun!"` };
+        return { word, definition, example: `Example: "The ${word} is fun!"` };
     }
 };
 
@@ -199,13 +202,14 @@ const pronunciationTool = {
     execute: async ({ text }, { sessionId }) => {
         const score = Math.floor(Math.random() * 20) + 80;
         const feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : "Great job! 👍";
+        const starCount = score >= 95 ? 3 : score >= 90 ? 2 : 1;
         
-        // 通过 WebSocket 发送星星动画到前端
+        // 可选：通过 WebSocket 发送星星动画到前端（工具自己决定）
         const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
         if (roomInfo) {
             sendToolCallToClient(roomInfo[0], {
                 type: 'showStars',
-                count: score >= 95 ? 3 : score >= 90 ? 2 : 1
+                count: starCount
             });
         }
         
@@ -300,6 +304,10 @@ const unsplashSearchTool = {
     }
 };
 
+// ==================== 工具列表 ====================
+// 注意：每个工具自己决定是否需要推送消息到前端
+// - 前端工具（显示图片、播放动画）：调用 sendToolCallToClient()
+// - 后端工具（查天气、查订单）：不调用，直接返回结果
 const TOOLS = [dictionaryTool, pronunciationTool, showImageTool, unsplashSearchTool];
 
 // Agent 会话管理
