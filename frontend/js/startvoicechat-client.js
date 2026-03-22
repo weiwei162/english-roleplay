@@ -202,6 +202,9 @@ class StartVoiceChatClient {
             this.character = character;
             this.isAIJoined = true;
             
+            // 建立 WebSocket 连接（用于工具调用）
+            this.setupWebSocket();
+            
             // 触发 AI 已加入回调
             this.onAIJoined({
                 character: character,
@@ -222,6 +225,92 @@ class StartVoiceChatClient {
             this.onError(error);
             throw error;
         }
+    }
+
+    /**
+     * 建立 WebSocket 连接（用于接收工具调用指令）
+     */
+    setupWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/room/${this.roomId}`;
+        
+        console.log('🔌 Connecting WebSocket:', wsUrl);
+        
+        this.ws = new WebSocket(wsUrl);
+        
+        this.ws.onopen = () => {
+            console.log('✅ WebSocket connected');
+        };
+        
+        this.ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                console.log('📩 WebSocket message:', message);
+                
+                if (message.type === 'connected') {
+                    console.log('✅ WebSocket handshake complete');
+                } else if (message.type === 'showEmoji') {
+                    // 显示 emoji
+                    this.onToolCall({ type: 'showEmoji', emoji: message.emoji });
+                } else if (message.type === 'showStars') {
+                    // 显示星星动画
+                    this.onToolCall({ type: 'showStars', count: message.count });
+                }
+            } catch (error) {
+                console.error('❌ Failed to parse WebSocket message:', error);
+            }
+        };
+        
+        this.ws.onerror = (error) => {
+            console.error('❌ WebSocket error:', error);
+        };
+        
+        this.ws.onclose = () => {
+            console.log('🔌 WebSocket closed');
+        };
+    }
+
+    /**
+     * 工具调用回调（由 WebSocket 触发）
+     * @param {Object} toolCall - 工具调用数据
+     */
+    onToolCall(toolCall) {
+        console.log('🛠️ Tool call received:', toolCall);
+        
+        if (toolCall.type === 'showEmoji') {
+            // 显示 floating emoji
+            this.showFloatingEmoji(toolCall.emoji);
+        } else if (toolCall.type === 'showStars') {
+            // 显示星星动画
+            this.showStars(toolCall.count);
+        }
+    }
+
+    /**
+     * 显示 floating emoji 动画
+     */
+    showFloatingEmoji(emoji) {
+        const canvas = document.getElementById('canvas');
+        const emojiEl = document.createElement('div');
+        emojiEl.className = 'floating-emoji';
+        emojiEl.textContent = emoji;
+        canvas.appendChild(emojiEl);
+        
+        // 3 秒后移除
+        setTimeout(() => emojiEl.remove(), 3000);
+    }
+
+    /**
+     * 显示星星动画（用于发音评分）
+     */
+    showStars(count) {
+        const canvas = document.getElementById('canvas');
+        const starsEl = document.createElement('div');
+        starsEl.className = 'floating-stars';
+        starsEl.textContent = '⭐'.repeat(count);
+        canvas.appendChild(starsEl);
+        
+        setTimeout(() => starsEl.remove(), 2000);
     }
 
     /**
@@ -526,12 +615,20 @@ class StartVoiceChatClient {
      * 3. 销毁引擎
      */
     async leave() {
-        console.log('👋 [1/3] Leaving StartVoiceChat room...');
+        console.log('👋 [1/4] Leaving StartVoiceChat room...');
         
         try {
+            // 0. 关闭 WebSocket 连接
+            if (this.ws) {
+                console.log('🔌 [1/4] Closing WebSocket...');
+                this.ws.close();
+                this.ws = null;
+                console.log('✅ WebSocket closed');
+            }
+            
             // 1. 调用后端结束 AI 对话
             if (this.roomId && this.taskId) {
-                console.log('🤖 [2/3] Stopping AI conversation...');
+                console.log('🤖 [2/4] Stopping AI conversation...');
                 
                 // 获取认证 token
                 const authToken = window.authClient?.token;
@@ -552,7 +649,7 @@ class StartVoiceChatClient {
             
             // 2. 离开 RTC 房间
             if (this.engine) {
-                console.log('🚪 [3/3] Leaving RTC room...');
+                console.log('🚪 [3/4] Leaving RTC room...');
                 await this.engine.leaveRoom();
                 console.log('✅ Left RTC room');
             }

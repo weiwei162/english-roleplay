@@ -16,6 +16,7 @@ import path from 'path';
 import fs from 'fs';
 import https from 'https';
 import { fileURLToPath } from 'url';
+import { WebSocketServer } from 'ws';
 import { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLLMConfig, CHARACTER_CONFIGS, getCharacterConfig } from './volc-start-voicechat.js';
 import { combineCharacterAndScenePrompt } from './prompts.js';
 import { generateToken } from './token-generator.js';
@@ -51,6 +52,74 @@ const client = new VolcStartVoiceChatClient({
 
 // 会话存储
 const sessions = new Map();
+
+// ==================== WebSocket 支持（工具调用） ====================
+
+// 房间 → WebSocket 映射
+const roomSockets = new Map();
+
+// 创建 WebSocket 服务器（与 HTTP 服务器共享端口）
+let wss = null;
+
+function initWebSocket(server) {
+    wss = new WebSocketServer({ noServer: true });
+    
+    server.on('upgrade', (request, socket, head) => {
+        const url = new URL(request.url, `http://${request.headers.host}`);
+        
+        // 只处理 /room/:roomId 路径
+        const match = url.pathname.match(/^\/room\/(.+)$/);
+        if (!match) {
+            socket.destroy();
+            return;
+        }
+        
+        const roomId = match[1];
+        
+        wss.handleUpgrade(request, socket, head, (ws) => {
+            wss.emit('connection', ws, request, roomId);
+        });
+    });
+    
+    wss.on('connection', (ws, request, roomId) => {
+        console.log(`🔌 WebSocket connected: roomId=${roomId}`);
+        
+        // 保存 WebSocket 连接
+        roomSockets.set(roomId, ws);
+        
+        ws.on('close', () => {
+            console.log(`🔌 WebSocket disconnected: roomId=${roomId}`);
+            roomSockets.delete(roomId);
+        });
+        
+        ws.on('error', (error) => {
+            console.error(`❌ WebSocket error: roomId=${roomId}`, error.message);
+            roomSockets.delete(roomId);
+        });
+        
+        // 发送欢迎消息
+        ws.send(JSON.stringify({
+            type: 'connected',
+            roomId
+        }));
+    });
+}
+
+/**
+ * 通过 WebSocket 发送工具调用指令到前端
+ * @param {string} roomId - 房间 ID
+ * @param {Object} toolCall - 工具调用数据
+ */
+export function sendToolCallToClient(roomId, toolCall) {
+    const ws = roomSockets.get(roomId);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(toolCall));
+        console.log(`📤 Sent tool call to ${roomId}:`, toolCall);
+        return true;
+    }
+    console.warn(`⚠️ WebSocket not available for roomId=${roomId}`);
+    return false;
+}
 
 // ==================== pi-agent-core 集成（真实 Agent） ====================
 
@@ -94,7 +163,7 @@ const dictionaryTool = {
         },
         required: ['word']
     },
-    execute: async ({ word }) => {
+    execute: async ({ word }, { sessionId }) => {
         const definitions = {
             'lion': 'A big yellow cat that roars. King of animals! 🦁',
             'elephant': 'A very big gray animal with a long nose (trunk). 🐘',
@@ -103,6 +172,16 @@ const dictionaryTool = {
             'apple': 'A red or green fruit. Crunchy and sweet! 🍎',
             'banana': 'A yellow curved fruit. Monkeys love it! 🍌'
         };
+        
+        // 通过 WebSocket 发送 emoji 到前端
+        const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
+        if (roomInfo) {
+            sendToolCallToClient(roomInfo[0], {
+                type: 'showEmoji',
+                emoji: definitions[word.toLowerCase()]?.split(' ').pop() || '📖'
+            });
+        }
+        
         return { word, definition: definitions[word.toLowerCase()] || 'A special word!', example: `Example: "The ${word} is fun!"` };
     }
 };
@@ -117,14 +196,49 @@ const pronunciationTool = {
         },
         required: ['text']
     },
-    execute: async ({ text }) => {
+    execute: async ({ text }, { sessionId }) => {
         const score = Math.floor(Math.random() * 20) + 80;
         const feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : "Great job! 👍";
+        
+        // 通过 WebSocket 发送星星动画到前端
+        const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
+        if (roomInfo) {
+            sendToolCallToClient(roomInfo[0], {
+                type: 'showStars',
+                count: score >= 95 ? 3 : score >= 90 ? 2 : 1
+            });
+        }
+        
         return { score, feedback };
     }
 };
 
-const TOOLS = [dictionaryTool, pronunciationTool];
+// 新增：显示图片/emoji 工具
+const showImageTool = {
+    name: 'showImage',
+    description: 'Show an emoji or image to the child',
+    parameters: {
+        type: 'object',
+        properties: {
+            emoji: { type: 'string', description: 'Emoji to display, e.g., 🦁' }
+        },
+        required: ['emoji']
+    },
+    execute: async ({ emoji }, { sessionId }) => {
+        // 通过 WebSocket 发送 emoji 到前端
+        const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
+        if (roomInfo) {
+            sendToolCallToClient(roomInfo[0], {
+                type: 'showEmoji',
+                emoji
+            });
+        }
+        
+        return `Look! ${emoji}!`;
+    }
+};
+
+const TOOLS = [dictionaryTool, pronunciationTool, showImageTool];
 
 // Agent 会话管理
 const piAgents = new Map();
@@ -629,7 +743,11 @@ app.get('/', (req, res) => {
 
 function startServer() {
     // 同时启动 HTTP 和 HTTPS 服务器
-    startHTTP();
+    const httpServer = startHTTP();
+    
+    // 初始化 WebSocket（共享 HTTP 服务器端口）
+    initWebSocket(httpServer);
+    console.log(`🔌 WebSocket server ready on ws://localhost:${PORT}/room/:roomId`);
     
     if (USE_HTTPS) {
         try {
@@ -638,9 +756,13 @@ function startServer() {
                 cert: fs.readFileSync(SSL_CERT_PATH)
             };
             
-            https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
+            const httpsServer = https.createServer(httpsOptions, app);
+            httpsServer.listen(HTTPS_PORT, () => {
                 console.log(`✅ HTTPS server running on https://localhost:${HTTPS_PORT}`);
             });
+            
+            // HTTPS 也支持 WebSocket
+            initWebSocket(httpsServer);
         } catch (error) {
             console.error('❌ HTTPS setup failed:', error.message);
             console.log('⚠️  Only HTTP available');
@@ -649,10 +771,11 @@ function startServer() {
 }
 
 function startHTTP() {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
         console.log(`✅ HTTP server running on http://localhost:${PORT}`);
         console.log(`📱 Access: http://localhost:${PORT}`);
     });
+    return server;
 }
 
 startServer();
