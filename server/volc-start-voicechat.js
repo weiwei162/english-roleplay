@@ -282,8 +282,9 @@ function getComponentConfig(options = {}) {
                 SilenceTime: 600,
                 AIVAD: true
             },
+            VolumeGain: 0.3,
             InterruptConfig: {
-                InterruptSpeechDuration: 1000 // 1 秒
+                InterruptSpeechDuration: 200
             }
         },
         
@@ -388,8 +389,9 @@ function getCustomLLMConfig(options = {}) {
                 SilenceTime: 600,
                 AIVAD: true
             },
+            VolumeGain: 0.3,
             InterruptConfig: {
-                InterruptSpeechDuration: 1000 // 1 秒
+                InterruptSpeechDuration: 200
             }
         },
         
