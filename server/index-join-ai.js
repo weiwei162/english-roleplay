@@ -83,18 +83,6 @@ function getLLMModel() {
     return getModel(LLM_PROVIDER, LLM_MODEL);
 }
 
-const TEACHER_SYSTEM_PROMPT = `You are a friendly and encouraging English teacher for kids aged 6-10.
-
-Your role:
-- Speak in simple, clear English
-- Use short sentences (under 30 words)
-- Be patient and supportive
-- Use emojis 🦁🌟🎉
-- Ask follow-up questions
-- Praise frequently
-
-Always respond in English only.`;
-
 // 工具定义（pi-agent-core 格式）
 const dictionaryTool = {
     name: 'dictionary',
@@ -150,7 +138,7 @@ function getOrCreateAgent(sessionId, systemPrompt) {
     if (!piAgents.has(sessionId)) {
         const agent = new Agent({
             initialState: {
-                systemPrompt: systemPrompt || TEACHER_SYSTEM_PROMPT,
+                systemPrompt: systemPrompt,
                 model: getLLMModel(),
                 thinkingLevel: 'off',
                 tools: TOOLS,
@@ -244,7 +232,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     
     // 从 sessionId 解析角色和场景信息
     // sessionId 格式：session_{userId}_{character}_{sceneId}_{timestamp}
-    let systemPrompt = TEACHER_SYSTEM_PROMPT;
+    let systemPrompt = '';
     const sessionParts = sessionId.split('_');
     if (sessionParts.length >= 4) {
         const character = sessionParts[2];

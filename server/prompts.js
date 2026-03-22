@@ -43,7 +43,7 @@ Focus on:
         ],
         
         // 欢迎词
-        welcomeMessage: "Welcome to the magic zoo! Let's meet the animals!"
+        welcomeMessage: "欢迎来到魔法动物园！What animal do you want to see?"
     },
     
     market: {
@@ -81,7 +81,7 @@ Focus on:
             "What do you want to eat?"
         ],
         
-        welcomeMessage: "Let's go shopping! What's your favorite food?"
+        welcomeMessage: "欢迎来到欢乐超市！What food do you like?"
     },
     
     home: {
@@ -119,7 +119,7 @@ Focus on:
             "Can you help me...?"
         ],
         
-        welcomeMessage: "Hi! Welcome to my home! Let's play together!"
+        welcomeMessage: "欢迎来到我的家！What do you want to play?"
     },
     
     park: {
@@ -157,7 +157,7 @@ Focus on:
             "Do you see the {animal}?"
         ],
         
-        welcomeMessage: "What a beautiful day! Let's play in the park!"
+        welcomeMessage: "今天天气真好！What do you want to play?"
     }
 };
 

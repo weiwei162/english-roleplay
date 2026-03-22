@@ -699,14 +699,14 @@ async function createStartVoiceChatRoom(roomId, options = {}) {
 /**
  * 将 AI 角色加入房间
  */
-async function joinAICharacter(character) {
+async function joinAICharacter(character, scene) {
     if (!window.currentVoiceChat) {
         throw new Error('Room not created');
     }
     
     try {
         // 步骤 2: 调用后端 API 将 AI 加入
-        await window.currentVoiceChat.joinAI(character);
+        await window.currentVoiceChat.joinAI(character, scene);
         
     } catch (error) {
         console.error('❌ Failed to join AI:', error);
