@@ -265,7 +265,12 @@ const showImageTool = {
         },
         required: ['query']
     },
-    execute: ({ query, orientation = 'landscape' }, { sessionId }) => {
+    execute: (args, { sessionId }) => {
+        const query = args?.query || 'animal'; // 默认值保护
+        const orientation = args?.orientation || 'landscape';
+        
+        console.log(`🖼️ [Tool] showImage called with query: "${query}"`);
+        
         // 异步执行图片搜索和发送，不阻塞 Agent 流程
         // 工具立即返回，让 Agent 继续生成回复
         setTimeout(async () => {
