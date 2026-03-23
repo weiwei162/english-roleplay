@@ -163,7 +163,7 @@ const dictionaryTool = {
         },
         required: ['word']
     },
-    execute: async ({ word }, { sessionId }) => {
+    execute: ({ word }, { sessionId }) => {
         const definitions = {
             'lion': 'A big yellow cat that roars. King of animals! 🦁',
             'elephant': 'A very big gray animal with a long nose (trunk). 🐘',
@@ -176,15 +176,20 @@ const dictionaryTool = {
         const definition = definitions[word.toLowerCase()] || 'A special word!';
         const emoji = definition.split(' ').pop();
         
-        // 可选：通过 WebSocket 发送 emoji 到前端（工具自己决定）
-        const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-        if (roomInfo && emoji) {
-            sendToolCallToClient(roomInfo[0], {
-                type: 'showEmoji',
-                emoji
-            });
+        // 异步发送 emoji，不阻塞 Agent
+        if (emoji) {
+            setTimeout(() => {
+                const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
+                if (roomInfo) {
+                    sendToolCallToClient(roomInfo[0], {
+                        type: 'showEmoji',
+                        emoji
+                    });
+                }
+            }, 0);
         }
         
+        // 立即返回结果
         return { word, definition, example: `Example: "The ${word} is fun!"` };
     }
 };
@@ -199,20 +204,23 @@ const pronunciationTool = {
         },
         required: ['text']
     },
-    execute: async ({ text }, { sessionId }) => {
+    execute: ({ text }, { sessionId }) => {
         const score = Math.floor(Math.random() * 20) + 80;
         const feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : "Great job! 👍";
         const starCount = score >= 95 ? 3 : score >= 90 ? 2 : 1;
         
-        // 可选：通过 WebSocket 发送星星动画到前端（工具自己决定）
-        const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-        if (roomInfo) {
-            sendToolCallToClient(roomInfo[0], {
-                type: 'showStars',
-                count: starCount
-            });
-        }
+        // 异步发送星星动画，不阻塞 Agent
+        setTimeout(() => {
+            const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
+            if (roomInfo) {
+                sendToolCallToClient(roomInfo[0], {
+                    type: 'showStars',
+                    count: starCount
+                });
+            }
+        }, 0);
         
+        // 立即返回结果
         return { score, feedback };
     }
 };
@@ -227,16 +235,21 @@ const showEmojiTool = {
         },
         required: ['emoji']
     },
-    execute: async ({ emoji }, { sessionId }) => {
-        // 通过 WebSocket 发送 emoji 到前端
-        const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-        if (roomInfo) {
-            sendToolCallToClient(roomInfo[0], {
-                type: 'showEmoji',
-                emoji
-            });
-        }
+    execute: ({ emoji }, { sessionId }) => {
+        // 异步执行 emoji 发送，不阻塞 Agent 流程
+        // 工具立即返回，让 Agent 继续生成回复
+        setTimeout(() => {
+            // 通过 WebSocket 发送 emoji 到前端
+            const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
+            if (roomInfo) {
+                sendToolCallToClient(roomInfo[0], {
+                    type: 'showEmoji',
+                    emoji
+                });
+            }
+        }, 0);
         
+        // 立即返回，不阻塞 Agent
         return `Look! ${emoji}!`;
     }
 };
@@ -252,52 +265,57 @@ const showImageTool = {
         },
         required: ['query']
     },
-    execute: async ({ query, orientation = 'landscape' }, { sessionId }) => {
-        const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
-        const unsplashUrl = process.env.UNSPLASH_API_URL || 'https://api.unsplash.com';
-        
-        let imageUrl = null;
-        let photographer = 'Unknown';
-        
-        // 如果配置了 Unsplash API Key，调用真实 API
-        if (unsplashKey) {
-            try {
-                const searchUrl = `${unsplashUrl}/search/photos?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=1&client_id=${unsplashKey}`;
-                const response = await fetch(searchUrl);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.results && data.results.length > 0) {
-                        const img = data.results[0];
-                        imageUrl = img.urls.regular || img.urls.small || img.urls.thumb;
-                        photographer = img.user?.name || 'Unknown';
-                        
-                        console.log(`🖼️ Unsplash search: "${query}" → ${imageUrl}`);
+    execute: ({ query, orientation = 'landscape' }, { sessionId }) => {
+        // 异步执行图片搜索和发送，不阻塞 Agent 流程
+        // 工具立即返回，让 Agent 继续生成回复
+        setTimeout(async () => {
+            const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+            const unsplashUrl = process.env.UNSPLASH_API_URL || 'https://api.unsplash.com';
+            
+            let imageUrl = null;
+            let photographer = 'Unknown';
+            
+            // 如果配置了 Unsplash API Key，调用真实 API
+            if (unsplashKey) {
+                try {
+                    const searchUrl = `${unsplashUrl}/search/photos?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=1&client_id=${unsplashKey}`;
+                    const response = await fetch(searchUrl);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.results && data.results.length > 0) {
+                            const img = data.results[0];
+                            imageUrl = img.urls.regular || img.urls.small || img.urls.thumb;
+                            photographer = img.user?.name || 'Unknown';
+                            
+                            console.log(`🖼️ Unsplash search: "${query}" → ${imageUrl}`);
+                        }
                     }
+                } catch (error) {
+                    console.error('❌ Unsplash API error:', error.message);
                 }
-            } catch (error) {
-                console.error('❌ Unsplash API error:', error.message);
             }
-        }
+            
+            // 如果没有配置 API Key 或 API 调用失败，使用 Picsum 随机图片
+            if (!imageUrl) {
+                const seed = encodeURIComponent(query.toLowerCase());
+                imageUrl = `https://picsum.photos/seed/${seed}/800/600`;
+                console.log(`🖼️ Using Picsum fallback for: "${query}"`);
+            }
+            
+            // 通过 WebSocket 发送图片到前端
+            const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
+            if (roomInfo) {
+                sendToolCallToClient(roomInfo[0], {
+                    type: 'showImage',
+                    url: imageUrl,
+                    caption: query,
+                    photographer
+                });
+            }
+        }, 0);
         
-        // 如果没有配置 API Key 或 API 调用失败，使用 Picsum 随机图片
-        if (!imageUrl) {
-            const seed = encodeURIComponent(query.toLowerCase());
-            imageUrl = `https://picsum.photos/seed/${seed}/800/600`;
-            console.log(`🖼️ Using Picsum fallback for: "${query}"`);
-        }
-        
-        // 通过 WebSocket 发送图片到前端
-        const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-        if (roomInfo) {
-            sendToolCallToClient(roomInfo[0], {
-                type: 'showImage',
-                url: imageUrl,
-                caption: query,
-                photographer
-            });
-        }
-        
+        // 立即返回，不阻塞 Agent
         return `Look at this ${query}!`;
     }
 };
