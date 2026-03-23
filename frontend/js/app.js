@@ -9,9 +9,6 @@ let contentCounter = 0;
 let characterPosition = { x: 50, y: 60 }; // 角色位置（百分比）
 let audioContext = null;
 
-// ⚠️ 语音识别已移除：StartVoiceChat 模式下不需要
-// 火山引擎云端自动处理 ASR 语音识别
-
 // ============== 初始化检查 ==============
 console.log('🔍 [Init] Checking global objects:');
 console.log('   window.Character:', window.Character);
@@ -84,9 +81,6 @@ function playSound(type) {
     }
 }
 
-// ⚠️ 录音相关函数已移除：StartVoiceChat 模式下不需要
-// 音频通过 RTC 直接传输，不需要手动录音
-
 // 语音合成 + 说话动画
 function speak(text, callback) {
     if ('speechSynthesis' in window) {
@@ -151,7 +145,6 @@ function speak(text, callback) {
  * 切换屏幕
  * 注意：离开画布界面时需要离开 AI 房间
  */
-// 导出到全局
 async function showScreen(screenId) {
     console.log('📺 Switching to screen:', screenId);
     
@@ -177,12 +170,7 @@ async function showScreen(screenId) {
     }
     
     // 特殊处理
-    if (screenId === 'character-select') {
-        toggleSettings(false);
-    }
-    
-    if (screenId === 'login-screen') {
-        // 登录界面不显示设置按钮
+    if (screenId === 'canvas-screen') {
         toggleSettings(false);
     }
 }
@@ -196,10 +184,6 @@ async function selectCharacter(charId) {
     }
     
     currentCharacter = getCharacter(charId);
-    
-    // 重置 AI 说话计数器
-    aiSpeakCount = 0;
-    console.log('🔄 [Reset] aiSpeakCount reset to 0');
     
     document.getElementById('current-avatar').textContent = currentCharacter.avatar;
     document.getElementById('current-char-name').textContent = currentCharacter.name;
@@ -404,8 +388,6 @@ function moveCharacterRandomly(count) {
  * 数据流：
  * 孩子说话 → RTC 音频流 → 火山云端 (ASR+LLM+TTS) → RTC 音频流 → 播放 AI 声音
  * 
- * ⚠️ 注意：不需要 WebSocket！不需要手动发送音频！
- * 
  * 参考文档：INTEGRATION-FLOW.md
  */
 
@@ -599,8 +581,11 @@ async function selectScene(sceneId) {
     // 清空画布内容
     clearCanvasContent();
     
+    // 重置 AI 说话计数器
+    aiSpeakCount = 0;
+    console.log('🔄 [Reset] aiSpeakCount reset to 0');
+    
     // ⭐ 创建 AI 语音聊天房间（StartVoiceChat API）
-    // 这是关键步骤：后端创建房间，前端加入 RTC
     console.log('🏠 Creating AI voice chat room...');
     try {
         await createAIVoiceChatRoom();
@@ -1000,9 +985,6 @@ function bindEvents() {
         });
     });
 
-    // ⚠️ 录音按钮已移除：StartVoiceChat 模式下不需要
-    // 音频通过 RTC 直接传输，不需要手动录音
-
     console.log('✅ Events bound');
 }
 
@@ -1101,24 +1083,6 @@ document.addEventListener('visibilitychange', async function() {
     }
 });
 
-// ==================== ⭐ StartVoiceChat 模式说明 ====================
-
-/**
- * 当前使用 StartVoiceChat 模式，不需要 WebSocket！
- * 
- * 集成流程：
- * 1. 用户选择场景 → selectScene()
- * 2. 调用 createAIVoiceChatRoom()
- * 3. 后端创建房间并启动 AI (StartVoiceChat API)
- * 4. 前端通过 RTC 加入房间
- * 5. 实时对话开始（RTC 传输音频流）
- * 
- * 数据流：
- * 孩子说话 → RTC 音频流 → 火山引擎云端 (ASR+LLM+TTS) → RTC 音频流 → 播放 AI 声音
- * 
- * 参考文档：INTEGRATION-FLOW.md
- */
-
 // ==================== 初始化 ====================
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1168,6 +1132,10 @@ let audioLevelTimer = null;
  */
 function toggleMute() {
     isMuted = !isMuted;
+    
+    if (window.currentVoiceChat) {
+        window.currentVoiceChat.muteLocalAudio(isMuted);
+    }
     
     const muteBtn = document.getElementById('mute-btn');
     const rtcStatus = document.getElementById('rtc-status');
@@ -1265,25 +1233,6 @@ function hideAudioControlBar() {
     }
 }
 
-/**
- * 更新 RTC 状态显示
- */
-function updateRTCStatus(status, text) {
-    const rtcStatus = document.getElementById('rtc-status');
-    if (!rtcStatus) return;
-    
-    rtcStatus.className = 'rtc-status ' + status;
-    
-    const statusTexts = {
-        'connected': '🟢 已连接',
-        'connecting': '🟡 连接中...',
-        'error': '🔴 连接失败',
-        'disconnected': '⚪ 已断开'
-    };
-    
-    rtcStatus.textContent = text || statusTexts[status] || status;
-}
-
 // ==================== 导出全局函数 ====================
 
 window.toggleMute = toggleMute;
@@ -1292,9 +1241,5 @@ window.startAudioLevelMonitor = startAudioLevelMonitor;
 window.stopAudioLevelMonitor = stopAudioLevelMonitor;
 window.showAudioControlBar = showAudioControlBar;
 window.hideAudioControlBar = hideAudioControlBar;
-window.updateRTCStatus = updateRTCStatus;
 window.showScreen = showScreen;
-window.updateAuthUI = updateAuthUI;
 window.checkAuthAndShowScreen = checkAuthAndShowScreen;
-
-console.log('🔧 Enhanced app module loaded with WebSocket support');

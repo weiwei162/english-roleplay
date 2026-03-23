@@ -13,7 +13,7 @@
 
 class StartVoiceChatClient {
     constructor(options = {}) {
-        this.appId = options.appId; // 从前端配置获取
+        this.appId = options.appId;
         this.roomId = null;
         this.taskId = null;
         this.character = null;
@@ -41,7 +41,7 @@ class StartVoiceChatClient {
      * @param {boolean} options.fetchConfig - 是否从后端获取配置（默认 true）
      */
     async createRoom(roomId, options = {}) {
-        console.log('🏠 [1/5] Creating RTC room (frontend)...', { roomId });
+        console.log('🏠 [1/4] Creating RTC room (frontend)...', { roomId });
         
         try {
             this.roomId = roomId;
@@ -75,7 +75,7 @@ class StartVoiceChatClient {
             
             this.isRoomCreated = true;
             
-            console.log('✅ [1/5] RTC room created and joined');
+            console.log('✅ [1/4] RTC room created and joined');
             this.onStatusChange('room_created', '房间已创建');
             
             // 触发就绪回调，让调用者知道可以加入 AI 了
@@ -88,7 +88,7 @@ class StartVoiceChatClient {
             return { roomId: this.roomId, userId: this.localUserId, appId: this.appId };
             
         } catch (error) {
-            console.error('❌ [1/5] Create room failed:', error.message);
+            console.error('❌ [1/4] Create room failed:', error.message);
             console.error('   RoomId:', roomId);
             console.error('   AppId:', this.appId);
             console.error('   LocalUserId:', this.localUserId);
@@ -168,7 +168,7 @@ class StartVoiceChatClient {
      */
     async joinAI(character, scene) {
         const sceneId = scene || 'zoo';
-        console.log('🤖 [2/5] Joining AI character to room...', { character, scene: sceneId, roomId: this.roomId });
+        console.log('🤖 [2/4] Joining AI character to room...', { character, scene: sceneId, roomId: this.roomId });
         
         try {
             // 获取认证 token
@@ -196,7 +196,7 @@ class StartVoiceChatClient {
             
             const data = await response.json();
             
-            console.log('✅ [2/5] AI joined room:', data);
+            console.log('✅ [2/4] AI joined room:', data);
             
             this.taskId = data.taskId;
             this.character = character;
@@ -217,7 +217,7 @@ class StartVoiceChatClient {
             return data;
             
         } catch (error) {
-            console.error('❌ [2/5] Join AI failed:', error.message);
+            console.error('❌ [2/4] Join AI failed:', error.message);
             console.error('   RoomId:', this.roomId);
             console.error('   Character:', character);
             console.error('   SceneId:', sceneId);
@@ -255,6 +255,9 @@ class StartVoiceChatClient {
                 } else if (message.type === 'showStars') {
                     // 显示星星动画
                     this.onToolCall({ type: 'showStars', count: message.count });
+                } else if (message.type === 'showImage') {
+                    // 显示图片
+                    this.onToolCall({ type: 'showImage', url: message.url, caption: message.caption, photographer: message.photographer });
                 }
             } catch (error) {
                 console.error('❌ Failed to parse WebSocket message:', error);
@@ -284,8 +287,8 @@ class StartVoiceChatClient {
             // 显示星星动画
             this.showStars(toolCall.count);
         } else if (toolCall.type === 'showImage') {
-            // 显示 Unsplash 图片
-            this.showUnsplashImage(toolCall.url, toolCall.caption, toolCall.photographer);
+            // 显示图片
+            this.showImage(toolCall.url, toolCall.caption, toolCall.photographer);
         }
     }
 
@@ -319,7 +322,7 @@ class StartVoiceChatClient {
     /**
      * 显示 Unsplash 图片
      */
-    showUnsplashImage(url, caption, photographer) {
+    showImage(url, caption, photographer) {
         const canvas = document.getElementById('canvas');
         
         // 创建图片容器
@@ -362,7 +365,7 @@ class StartVoiceChatClient {
     }
 
     /**
-     * 步骤 3: 初始化 RTC 引擎
+     * 初始化 RTC 引擎
      */
     async initRTC() {
         return new Promise((resolve, reject) => {
@@ -389,7 +392,7 @@ class StartVoiceChatClient {
     }
 
     /**
-     * 步骤 4: 加入 RTC 房间
+     * 加入 RTC 房间
      */
     async joinRoom(token) {
         console.log('🔌 Joining RTC room:', this.roomId, 'as', this.localUserId);
@@ -436,7 +439,7 @@ class StartVoiceChatClient {
     }
 
     /**
-     * 步骤 5: 开启本地音视频采集
+     * 开启本地音视频采集
      */
     async startLocalCapture() {
         console.log('🎤 Starting local audio capture...');
@@ -655,7 +658,7 @@ class StartVoiceChatClient {
     }
 
     /**
-     * 步骤 6: 结束 AI 对话并离开房间
+     * 结束 AI 对话并离开房间
      * 
      * 流程：
      * 1. 调用后端 API 结束 AI 对话
@@ -663,12 +666,12 @@ class StartVoiceChatClient {
      * 3. 销毁引擎
      */
     async leave() {
-        console.log('👋 [1/4] Leaving StartVoiceChat room...');
+        console.log('👋 Leaving StartVoiceChat room...');
         
         try {
             // 0. 关闭 WebSocket 连接
             if (this.ws) {
-                console.log('🔌 [1/4] Closing WebSocket...');
+                console.log('🔌 Closing WebSocket...');
                 this.ws.close();
                 this.ws = null;
                 console.log('✅ WebSocket closed');
@@ -676,7 +679,7 @@ class StartVoiceChatClient {
             
             // 1. 调用后端结束 AI 对话
             if (this.roomId && this.taskId) {
-                console.log('🤖 [2/4] Stopping AI conversation...');
+                console.log('🤖 Stopping AI conversation...');
                 
                 // 获取认证 token
                 const authToken = window.authClient?.token;
@@ -697,7 +700,7 @@ class StartVoiceChatClient {
             
             // 2. 离开 RTC 房间
             if (this.engine) {
-                console.log('🚪 [3/4] Leaving RTC room...');
+                console.log('🚪 Leaving RTC room...');
                 await this.engine.leaveRoom();
                 console.log('✅ Left RTC room');
             }
@@ -768,21 +771,6 @@ class StartVoiceChatClient {
             videoLayer.classList.remove('active');
             if (characterLayer) characterLayer.style.display = 'block';
         }
-    }
-
-    /**
-     * 生成 RTC Token（前端生成，简化版）
-     * 注意：生产环境应该后端生成
-     */
-    generateToken(roomId, uid, expireSeconds = 3600) {
-        // 简单实现：使用固定 token 或调用后端 API 获取
-        // 这里假设后端提供了一个获取 token 的接口
-        
-        // 实际应该调用后端：GET /api/token?roomId=xxx&uid=xxx
-        // 返回真正的 token
-        
-        // 临时方案：返回空字符串，让后端验证
-        return '';
     }
 }
 
@@ -882,9 +870,15 @@ function updateRTCStatus(status, text) {
     if (!rtcStatus) return;
     
     rtcStatus.className = 'rtc-status ' + status;
-    rtcStatus.textContent = text;
     
-    console.log('📊 RTC Status:', status, '-', text);
+    const statusTexts = {
+        'connected': '🟢 已连接',
+        'connecting': '🟡 连接中...',
+        'error': '🔴 连接失败',
+        'disconnected': '⚪ 已断开'
+    };
+    
+    rtcStatus.textContent = text || statusTexts[status] || status;
 }
 
 /**
@@ -940,36 +934,11 @@ function toggleVideoMode() {
     }
 }
 
-/**
- * 切换静音
- */
-function toggleMute() {
-    const isMuted = document.getElementById('mute-btn').classList.contains('muted');
-    
-    if (window.currentVoiceChat) {
-        window.currentVoiceChat.muteLocalAudio(!isMuted);
-    }
-    
-    const muteBtn = document.getElementById('mute-btn');
-    const rtcStatus = document.getElementById('rtc-status');
-    
-    if (!isMuted) {
-        muteBtn.classList.add('muted');
-        muteBtn.innerHTML = '🔇 已静音';
-        rtcStatus.textContent = '🔇 已静音';
-    } else {
-        muteBtn.classList.remove('muted');
-        muteBtn.innerHTML = '🎤 说话中';
-        rtcStatus.textContent = '🟢 连接中';
-    }
-}
-
 // 导出全局函数
 window.createStartVoiceChatRoom = createStartVoiceChatRoom;
 window.joinAICharacter = joinAICharacter;
 window.leaveStartVoiceChatRoom = leaveStartVoiceChatRoom;
 window.toggleVideoMode = toggleVideoMode;
-window.toggleMute = toggleMute;
 window.updateRTCStatus = updateRTCStatus;
 window.showVideoLoading = showVideoLoading;
 window.hideVideoLoading = hideVideoLoading;

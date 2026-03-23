@@ -217,10 +217,9 @@ const pronunciationTool = {
     }
 };
 
-// 新增：显示图片/emoji 工具
-const showImageTool = {
-    name: 'showImage',
-    description: 'Show an emoji or image to the child',
+const showEmojiTool = {
+    name: 'showEmoji',
+    description: 'Show an emoji to the child',
     parameters: {
         type: 'object',
         properties: {
@@ -242,9 +241,8 @@ const showImageTool = {
     }
 };
 
-// Unsplash 图片搜索工具
-const unsplashSearchTool = {
-    name: 'unsplash_search',
+const showImageTool = {
+    name: 'showImage',
     description: 'Search and display a real photo from Unsplash (e.g., animals, places, objects)',
     parameters: {
         type: 'object',
@@ -308,7 +306,7 @@ const unsplashSearchTool = {
 // 注意：每个工具自己决定是否需要推送消息到前端
 // - 前端工具（显示图片、播放动画）：调用 sendToolCallToClient()
 // - 后端工具（查天气、查订单）：不调用，直接返回结果
-const TOOLS = [dictionaryTool, pronunciationTool, showImageTool, unsplashSearchTool];
+const TOOLS = [showEmojiTool, showImageTool];
 
 // Agent 会话管理
 const piAgents = new Map();
