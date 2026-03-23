@@ -1262,3 +1262,51 @@ h1 {
 .unsplash-close:hover {
     background: rgba(0,0,0,0.8);
 }
+
+/* 字幕显示层 */
+.subtitle-layer {
+    position: absolute;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 800px;
+    z-index: 100;
+    pointer-events: none;
+}
+
+.subtitle-text {
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 16px 24px;
+    border-radius: 12px;
+    font-size: 18px;
+    line-height: 1.5;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.subtitle-text.show {
+    opacity: 1;
+}
+
+.subtitle-text:empty {
+    display: none;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .subtitle-layer {
+        bottom: 100px;
+        width: 95%;
+    }
+    
+    .subtitle-text {
+        font-size: 16px;
+        padding: 12px 18px;
+    }
+}

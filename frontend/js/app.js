@@ -257,10 +257,11 @@ function handleCharacterClick() {
 }
 
 /**
- * 处理 AI 字幕事件 - 让角色在画布中自由移动
+ * 处理 AI 字幕事件 - 让角色在画布中自由移动 + 显示字幕
  * @param {Object} subtitle - 字幕数据
  */
 let aiSpeakCount = 0; // AI 说话次数计数器
+let subtitleTimeout = null; // 字幕自动隐藏定时器
 
 function handleAISubtitle(subtitle) {
     // 调试日志
@@ -317,8 +318,52 @@ function handleAISubtitle(subtitle) {
                     console.warn('⚠️ Particles.spawn not available or no canvas');
                 }
             }
+            
+            // 4. 显示字幕
+            showSubtitle(text);
         }
     }
+}
+
+/**
+ * 显示字幕
+ * @param {string} text - 字幕文本
+ */
+function showSubtitle(text) {
+    const subtitleEl = document.getElementById('subtitle-text');
+    const subtitleLayer = document.getElementById('subtitle-layer');
+    
+    if (!subtitleEl || !subtitleLayer) {
+        console.warn('⚠️ [Subtitle] Element not found');
+        return;
+    }
+    
+    // 更新字幕文本
+    subtitleEl.textContent = text;
+    
+    // 显示字幕
+    subtitleEl.classList.add('show');
+    subtitleLayer.style.display = 'block';
+    
+    // 清除之前的定时器
+    if (subtitleTimeout) {
+        clearTimeout(subtitleTimeout);
+    }
+    
+    // 根据文本长度设置显示时间（至少 2 秒，最多 8 秒）
+    const displayTime = Math.min(8000, Math.max(2000, text.length * 150));
+    
+    // 自动隐藏字幕
+    subtitleTimeout = setTimeout(() => {
+        subtitleEl.classList.remove('show');
+        setTimeout(() => {
+            if (!subtitleEl.classList.contains('show')) {
+                subtitleLayer.style.display = 'none';
+            }
+        }, 300); // 等待淡出动画完成
+    }, displayTime);
+    
+    console.log(`📺 [Subtitle] Displaying: "${text.substring(0, 50)}..." (${displayTime}ms)`);
 }
 
 /**
