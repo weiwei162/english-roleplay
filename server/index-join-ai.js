@@ -558,7 +558,7 @@ app.post('/v1/chat/completions', async (req, res) => {
             
             console.log(`🚀 [${requestId}] Calling agent.prompt with: "${userMessage.content.substring(0, 100)}${userMessage.content.length > 100 ? '...' : ''}"`);
 
-            if (agent.state().isStreaming) {
+            if (agent.state.isStreaming) {
                 await agent.steer(userMessage.content);
             } else {
                 await agent.prompt(userMessage.content);
@@ -598,7 +598,7 @@ app.post('/v1/chat/completions', async (req, res) => {
                 }
             });
             
-            if (agent.state().isStreaming) {
+            if (agent.state.isStreaming) {
                 await agent.steer(userMessage.content);
             } else {
                 await agent.prompt(userMessage.content);

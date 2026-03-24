@@ -958,6 +958,9 @@ function toggleSettings(forceState) {
     }
 }
 
+// 暴露到全局作用域（供 HTML onclick 使用）
+window.toggleSettings = toggleSettings;
+
 // 清除记忆
 function clearMemory() {
     if (confirm('Clear all memory? This will reset everything the friend remembers about you.')) {
