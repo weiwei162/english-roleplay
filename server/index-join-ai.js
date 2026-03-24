@@ -179,16 +179,15 @@ const dictionaryTool = {
         const emoji = definition.split(' ').pop();
         
         if (emoji) {
+            const roomId = toolCallSessionMap.get(toolCallId);
+            if (!roomId) {
+                throw new Error('Room not found');
+            }
             (async () => {
-                const roomId = toolCallSessionMap.get(toolCallId);
-                if (roomId) {
-                    sendToolCallToClient(roomId, {
-                        type: 'showEmoji',
-                        emoji
-                    });
-                } else {
-                    throw new Error('Room not found');
-                }
+                sendToolCallToClient(roomId, {
+                    type: 'showEmoji',
+                    emoji
+                });
             })();
         }
         
@@ -217,16 +216,15 @@ const pronunciationTool = {
         const feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : "Great job! 👍";
         const starCount = score >= 95 ? 3 : score >= 90 ? 2 : 1;
         
+        const roomId = toolCallSessionMap.get(toolCallId);
+        if (!roomId) {
+            throw new Error('Room not found');
+        }
         (async () => {
-            const roomId = toolCallSessionMap.get(toolCallId);
-            if (roomId) {
-                sendToolCallToClient(roomId, {
-                    type: 'showStars',
-                    count: starCount
-                });
-            } else {
-                throw new Error('Room not found');
-            }
+            sendToolCallToClient(roomId, {
+                type: 'showStars',
+                count: starCount
+            });
         })();
         
         const result = `Pronunciation score: ${score}/100 - ${feedback}`;
@@ -250,17 +248,17 @@ const showEmojiTool = {
     execute: async (toolCallId, params, signal, onUpdate) => {
         const { emoji } = params;
         
+        const roomId = toolCallSessionMap.get(toolCallId);
+        if (!roomId) {
+            throw new Error('Room not found');
+        }
+        
         (async () => {
-            const roomId = toolCallSessionMap.get(toolCallId);
-            if (roomId) {
-                sendToolCallToClient(roomId, {
-                    type: 'showEmoji',
-                    emoji
-                });
-            } else {
-                throw new Error('Room not found');
-            }
-       })();
+            sendToolCallToClient(roomId, {
+                type: 'showEmoji',
+                emoji
+            });
+        })();
         
         const result = `Look! ${emoji}! I'm showing it to you now.`;
         return {
@@ -283,6 +281,12 @@ const showImageTool = {
     },
     execute: async (toolCallId, params, signal, onUpdate) => {
         const { query, orientation = 'landscape' } = params;
+        
+        // 在异步操作前捕获 roomId，避免被 afterToolCall 清理
+        const roomId = toolCallSessionMap.get(toolCallId);
+        if (!roomId) {
+            throw new Error('Room not found');
+        }
         
         (async () => {
             const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
@@ -315,17 +319,12 @@ const showImageTool = {
                 console.log(`🖼️ Using Picsum fallback for: "${query}"`);
             }
             
-            const roomId = toolCallSessionMap.get(toolCallId);
-            if (roomId) {
-                sendToolCallToClient(roomId, {
-                    type: 'showImage',
-                    url: imageUrl,
-                    caption: query,
-                    photographer
-                });
-            } else {
-                throw new Error('Room not found');
-            }
+            sendToolCallToClient(roomId, {
+                type: 'showImage',
+                url: imageUrl,
+                caption: query,
+                photographer
+            });
         })();
         
         const result = `I'm finding a picture of ${query} for you! It should appear in a moment.`;
