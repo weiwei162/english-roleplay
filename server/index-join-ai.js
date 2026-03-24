@@ -163,7 +163,9 @@ const dictionaryTool = {
         },
         required: ['word']
     },
-    execute: ({ word }, { sessionId }) => {
+    execute: async (toolCallId, params, signal, onUpdate) => {
+        const { word } = params;
+        
         const definitions = {
             'lion': 'A big yellow cat that roars. King of animals! 🦁',
             'elephant': 'A very big gray animal with a long nose (trunk). 🐘',
@@ -173,24 +175,28 @@ const dictionaryTool = {
             'banana': 'A yellow curved fruit. Monkeys love it! 🍌'
         };
         
-        const definition = definitions[word.toLowerCase()] || 'A special word!';
+        const definition = definitions[word?.toLowerCase()] || 'A special word!';
         const emoji = definition.split(' ').pop();
         
-        // 异步发送 emoji，不阻塞 Agent
         if (emoji) {
-            setTimeout(() => {
-                const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-                if (roomInfo) {
-                    sendToolCallToClient(roomInfo[0], {
+            (async () => {
+                const roomId = toolCallSessionMap.get(toolCallId);
+                if (roomId) {
+                    sendToolCallToClient(roomId, {
                         type: 'showEmoji',
                         emoji
                     });
+                } else {
+                    throw new Error('Room not found');
                 }
-            }, 0);
+            })();
         }
         
-        // 立即返回结果
-        return { word, definition, example: `Example: "The ${word} is fun!"` };
+        const result = `${word}: ${definition} Example: "The ${word} is fun!"`;
+        return {
+            content: [{ type: 'text', text: result }],
+            details: { word, definition, status: 'started' }
+        };
     }
 };
 
@@ -204,24 +210,30 @@ const pronunciationTool = {
         },
         required: ['text']
     },
-    execute: ({ text }, { sessionId }) => {
+    execute: async (toolCallId, params, signal, onUpdate) => {
+        const { text } = params;
+        
         const score = Math.floor(Math.random() * 20) + 80;
         const feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : "Great job! 👍";
         const starCount = score >= 95 ? 3 : score >= 90 ? 2 : 1;
         
-        // 异步发送星星动画，不阻塞 Agent
-        setTimeout(() => {
-            const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-            if (roomInfo) {
-                sendToolCallToClient(roomInfo[0], {
+        (async () => {
+            const roomId = toolCallSessionMap.get(toolCallId);
+            if (roomId) {
+                sendToolCallToClient(roomId, {
                     type: 'showStars',
                     count: starCount
                 });
+            } else {
+                throw new Error('Room not found');
             }
-        }, 0);
+        })();
         
-        // 立即返回结果
-        return { score, feedback };
+        const result = `Pronunciation score: ${score}/100 - ${feedback}`;
+        return {
+            content: [{ type: 'text', text: result }],
+            details: { score, feedback, status: 'started' }
+        };
     }
 };
 
@@ -235,22 +247,26 @@ const showEmojiTool = {
         },
         required: ['emoji']
     },
-    execute: ({ emoji }, { sessionId }) => {
-        // 异步执行 emoji 发送，不阻塞 Agent 流程
-        // 工具立即返回，让 Agent 继续生成回复
-        setTimeout(() => {
-            // 通过 WebSocket 发送 emoji 到前端
-            const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-            if (roomInfo) {
-                sendToolCallToClient(roomInfo[0], {
+    execute: async (toolCallId, params, signal, onUpdate) => {
+        const { emoji } = params;
+        
+        (async () => {
+            const roomId = toolCallSessionMap.get(toolCallId);
+            if (roomId) {
+                sendToolCallToClient(roomId, {
                     type: 'showEmoji',
                     emoji
                 });
+            } else {
+                throw new Error('Room not found');
             }
-        }, 0);
+       })();
         
-        // 立即返回，不阻塞 Agent
-        return `Look! ${emoji}!`;
+        const result = `Look! ${emoji}! I'm showing it to you now.`;
+        return {
+            content: [{ type: 'text', text: result }],
+            details: { emoji, status: 'started' }
+        };
     }
 };
 
@@ -265,22 +281,16 @@ const showImageTool = {
         },
         required: ['query']
     },
-    execute: (args, { sessionId }) => {
-        const query = args?.query || 'animal'; // 默认值保护
-        const orientation = args?.orientation || 'landscape';
+    execute: async (toolCallId, params, signal, onUpdate) => {
+        const { query, orientation = 'landscape' } = params;
         
-        console.log(`🖼️ [Tool] showImage called with query: "${query}"`);
-        
-        // 异步执行图片搜索和发送，不阻塞 Agent 流程
-        // 工具立即返回，让 Agent 继续生成回复
-        setTimeout(async () => {
+        (async () => {
             const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
             const unsplashUrl = process.env.UNSPLASH_API_URL || 'https://api.unsplash.com';
             
             let imageUrl = null;
             let photographer = 'Unknown';
             
-            // 如果配置了 Unsplash API Key，调用真实 API
             if (unsplashKey) {
                 try {
                     const searchUrl = `${unsplashUrl}/search/photos?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=1&client_id=${unsplashKey}`;
@@ -292,36 +302,37 @@ const showImageTool = {
                             const img = data.results[0];
                             imageUrl = img.urls.regular || img.urls.small || img.urls.thumb;
                             photographer = img.user?.name || 'Unknown';
-                            
-                            console.log(`🖼️ Unsplash search: "${query}" → ${imageUrl}`);
-                        }
+                       }
                     }
                 } catch (error) {
                     console.error('❌ Unsplash API error:', error.message);
                 }
             }
             
-            // 如果没有配置 API Key 或 API 调用失败，使用 Picsum 随机图片
             if (!imageUrl) {
                 const seed = encodeURIComponent(query.toLowerCase());
                 imageUrl = `https://picsum.photos/seed/${seed}/800/600`;
                 console.log(`🖼️ Using Picsum fallback for: "${query}"`);
             }
             
-            // 通过 WebSocket 发送图片到前端
-            const roomInfo = Array.from(sessions.entries()).find(([_, s]) => s.taskId === sessionId);
-            if (roomInfo) {
-                sendToolCallToClient(roomInfo[0], {
+            const roomId = toolCallSessionMap.get(toolCallId);
+            if (roomId) {
+                sendToolCallToClient(roomId, {
                     type: 'showImage',
                     url: imageUrl,
                     caption: query,
                     photographer
                 });
+            } else {
+                throw new Error('Room not found');
             }
-        }, 0);
+        })();
         
-        // 立即返回，不阻塞 Agent
-        return `Look at this ${query}!`;
+        const result = `I'm finding a picture of ${query} for you! It should appear in a moment.`;
+        return {
+            content: [{ type: 'text', text: result }],
+            details: { query, orientation, status: 'searching' }
+        };
     }
 };
 
@@ -333,6 +344,9 @@ const TOOLS = [showEmojiTool, showImageTool];
 
 // Agent 会话管理
 const piAgents = new Map();
+
+// ToolCallId 与 SessionId 映射关系
+const toolCallSessionMap = new Map();
 
 /**
  * 获取或创建 Agent 实例
@@ -348,6 +362,20 @@ function getOrCreateAgent(sessionId, systemPrompt) {
                 thinkingLevel: 'off',
                 tools: TOOLS,
                 messages: []
+            },
+            beforeToolCall: (toolCall) => {
+                // 在工具调用前，记录 toolCallId 与 sessionId 的映射关系
+                if (toolCall.id && sessionId) {
+                    toolCallSessionMap.set(toolCall.id, sessionId);
+                    console.log(`🔗 [beforeToolCall] Mapped toolCallId=${toolCall.id} → sessionId=${sessionId}`);
+                }
+            },
+            afterToolCall: (toolCall, result) => {
+                // 在工具调用后，清理映射关系（可选，根据需要决定是否保留）
+                if (toolCall.id) {
+                    toolCallSessionMap.delete(toolCall.id);
+                    console.log(`🗑️ [afterToolCall] Cleaned toolCallId=${toolCall.id} → sessionId=${sessionId}`);
+                }
             }
         });
         piAgents.set(sessionId, agent);
@@ -436,12 +464,12 @@ app.post('/v1/chat/completions', async (req, res) => {
     const sessionId = req.query.session_id || `session_${Date.now()}`;
     
     // 从 sessionId 解析角色和场景信息
-    // sessionId 格式：session_{userId}_{character}_{sceneId}_{timestamp}
+    // sessionId 格式：room_{character}_{sceneId}_{timestamp}
     let systemPrompt = '';
     const sessionParts = sessionId.split('_');
-    if (sessionParts.length >= 4) {
-        const character = sessionParts[2];
-        const sceneId = sessionParts[3];
+    if (sessionParts.length >= 3) {
+        const character = sessionParts[1];
+        const sceneId = sessionParts[2];
         
         // 获取角色和场景配置
         try {
@@ -472,11 +500,42 @@ app.post('/v1/chat/completions', async (req, res) => {
             res.setHeader('X-Request-ID', requestId);
             
             let assistantMessage = '';
+            let eventCount = 0;
+            let toolCallCount = 0;
+            
+            console.log(`🔍 [${requestId}] Agent state before prompt:`, {
+                messages: agent.state.messages?.length || 0,
+                systemPrompt: agent.state.systemPrompt?.substring(0, 100) + '...'
+            });
+            
+            // 调试：打印 agent 上下文
+            console.log(`🔍 [${requestId}] Agent context before prompt:`, {
+                messages: agent.state.messages?.map(m => ({
+                    role: m.role,
+                    content: typeof m.content === 'string' ? m.content.substring(0, 100) : (Array.isArray(m.content) ? m.content.length + ' parts' : 'unknown'),
+                    toolCallId: m.toolCallId,
+                    toolName: m.toolName
+                }))
+            });
             
             const unsubscribe = agent.subscribe((event) => {
+                eventCount++;
+                console.log(`📡 [${requestId}] Event #${eventCount}:`, JSON.stringify({
+                    type: event.type,
+                    assistantMessageEvent: event.assistantMessageEvent ? {
+                        type: event.assistantMessageEvent.type,
+                        delta: event.assistantMessageEvent.delta?.substring(0, 50)
+                    } : null,
+                    toolCallEvent: event.toolCallEvent ? {
+                        name: event.toolCallEvent.name,
+                        args: event.toolCallEvent.args
+                    } : null
+                }));
+                
                 if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
                     const delta = event.assistantMessageEvent.delta;
                     assistantMessage += delta;
+                    console.log(`✍️ [${requestId}] Text delta (${delta.length} chars): "${delta.substring(0, 50)}${delta.length > 50 ? '...' : ''}"`);
                     
                     res.write(`data: ${JSON.stringify({
                         id: requestId,
@@ -490,15 +549,35 @@ app.post('/v1/chat/completions', async (req, res) => {
                         }]
                     })}\n\n`);
                 }
+                
+                if (event.type === 'tool_call' || event.toolCallEvent) {
+                    toolCallCount++;
+                    console.log(`🛠️ [${requestId}] Tool call #${toolCallCount}:`, event.toolCallEvent?.name || 'unknown');
+                }
             });
             
-            await agent.prompt(userMessage.content);
-            await agent.waitForIdle();
+            console.log(`🚀 [${requestId}] Calling agent.prompt with: "${userMessage.content.substring(0, 100)}${userMessage.content.length > 100 ? '...' : ''}"`);
+
+            if (agent.state().isStreaming) {
+                await agent.steer(userMessage.content);
+            } else {
+                await agent.prompt(userMessage.content);
+            }
             unsubscribe();
+            
+            console.log(`📊 [${requestId}] Agent state after prompt:`, {
+                events: eventCount,
+                toolCalls: toolCallCount,
+                finalMessage: assistantMessage.length,
+                messages: agent.state.messages?.length || 0
+            });
             
             const duration = Date.now() - startTime;
             console.log(`✅ [${requestId}] Stream response in ${duration}ms`);
             console.log(`   Assistant message length: ${assistantMessage.length} chars`);
+            if (assistantMessage.length === 0) {
+                console.warn(`⚠️ [${requestId}] WARNING: Empty response! Check events above.`);
+            }
             
             res.write(`data: ${JSON.stringify({
                 id: requestId,
@@ -519,8 +598,11 @@ app.post('/v1/chat/completions', async (req, res) => {
                 }
             });
             
-            await agent.prompt(userMessage.content);
-            await agent.waitForIdle();
+            if (agent.state().isStreaming) {
+                await agent.steer(userMessage.content);
+            } else {
+                await agent.prompt(userMessage.content);
+            }
             unsubscribe();
             
             const duration = Date.now() - startTime;
@@ -681,11 +763,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
     
     // targetUserId: 真人用户 ID（前端传入）
     // agentUserId: AI Bot 的 ID（后端生成）
-    const agentUserId = `ai_${character}_${roomId}`;
-    
-    // 生成 sessionId（与 userId、character、sceneId 绑定）
-    // sessionId 只用于 custom 模式，传递给 pi-agent
-    const sessionId = `session_${userId}_${character}_${sceneId}_${Date.now()}`;
+    const agentUserId = `ai_${roomId}`;
     
     // 根据 AI 模式获取角色配置（自动选择正确的 TTS 音色）
     const characterConfig = getCharacterConfig(character, AI_MODE);
@@ -721,7 +799,7 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             idleTimeout: 180
         });
     } else if (AI_MODE === 'custom') {
-        const customLlmUrl = process.env.PI_AGENT_URL + `?session_id=${sessionId}`;
+        const customLlmUrl = process.env.PI_AGENT_URL + `?session_id=${roomId}`;
         // Feature 配置（用于 HTTP 域名测试）
         const feature = process.env.PI_AGENT_FEATURE ? JSON.parse(process.env.PI_AGENT_FEATURE) : undefined;
         
@@ -781,7 +859,6 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
         aiMode: AI_MODE,
         userId,
         scene: sceneId,
-        sessionId,
         createdAt: Date.now()
     });
     
