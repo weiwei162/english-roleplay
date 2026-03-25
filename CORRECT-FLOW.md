@@ -316,9 +316,9 @@ http://localhost:3000
 
 ## 📚 参考文档
 
-- `INTEGRATION-FLOW.md` - 详细集成流程
+- `START.md` - 火山引擎启动指南
 - `QUICK-REFERENCE.md` - 快速参考
-- `DEPLOY-TEST.md` - 部署与测试
+- `DEPLOY-DOCKER.md` - Docker 部署
 
 ---
 
