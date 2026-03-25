@@ -6,10 +6,12 @@
 class AuthClient {
     constructor() {
         this.token = localStorage.getItem('auth_token');
-        this.user = null;
+        // 从 localStorage 恢复用户信息，避免刷新后丢失
+        const savedUser = localStorage.getItem('auth_user');
+        this.user = savedUser ? JSON.parse(savedUser) : null;
         
-        // 如果已有 token，验证是否有效
-        if (this.token) {
+        // 如果已有 token 但没有 user，验证 token 并获取用户信息
+        if (this.token && !this.user) {
             this.verifyToken();
         }
     }
@@ -31,6 +33,7 @@ class AuthClient {
                 this.token = data.token;
                 this.user = data.user;
                 localStorage.setItem('auth_token', this.token);
+                localStorage.setItem('auth_user', JSON.stringify(data.user));
                 console.log('✅ Registered:', username);
             }
             
@@ -62,6 +65,7 @@ class AuthClient {
                 this.token = data.token;
                 this.user = data.user;
                 localStorage.setItem('auth_token', this.token);
+                localStorage.setItem('auth_user', JSON.stringify(data.user));
                 console.log('✅ Logged in:', username);
             }
             
@@ -93,6 +97,7 @@ class AuthClient {
             
             if (data.success) {
                 this.user = data.user;
+                localStorage.setItem('auth_user', JSON.stringify(data.user));
                 return true;
             } else {
                 this.logout();
@@ -112,6 +117,7 @@ class AuthClient {
         this.token = null;
         this.user = null;
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
         console.log('👋 Logged out');
     }
     
