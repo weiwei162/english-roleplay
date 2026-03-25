@@ -114,10 +114,9 @@ export function sendToolCallToClient(roomId, toolCall) {
     const ws = roomSockets.get(roomId);
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(toolCall));
-        console.log(`📤 Sent tool call to ${roomId}:`, toolCall);
         return true;
     }
-    console.warn(`⚠️ WebSocket not available for roomId=${roomId}`);
+    console.error(`❌ [WebSocket] Room not found: ${roomId}`);
     return false;
 }
 
@@ -152,7 +151,24 @@ function getLLMModel() {
     return getModel(LLM_PROVIDER, LLM_MODEL);
 }
 
-// 工具定义（pi-agent-core 格式）
+// ==================== 工具执行辅助函数 ====================
+
+/**
+ * 验证 toolCallId 对应的 roomId 是否存在
+ * @param {string} toolCallId - 工具调用 ID
+ * @returns {string} - 房间 ID
+ * @throws {Error} - 当房间不存在时抛出错误
+ */
+function validateRoomId(toolCallId) {
+    const roomId = toolCallSessionMap.get(toolCallId);
+    if (!roomId) {
+        throw new Error('Room not found');
+    }
+    return roomId;
+}
+
+// ==================== 工具定义（pi-agent-core 格式） ====================
+
 const dictionaryTool = {
     name: 'dictionary',
     description: 'Look up the meaning of an English word for kids',
@@ -165,6 +181,7 @@ const dictionaryTool = {
     },
     execute: async (toolCallId, params, signal, onUpdate) => {
         const { word } = params;
+        const roomId = validateRoomId(toolCallId);
         
         const definitions = {
             'lion': 'A big yellow cat that roars. King of animals! 🦁',
@@ -179,21 +196,19 @@ const dictionaryTool = {
         const emoji = definition.split(' ').pop();
         
         if (emoji) {
-            const roomId = toolCallSessionMap.get(toolCallId);
-            if (!roomId) {
-                throw new Error('Room not found');
-            }
             (async () => {
-                sendToolCallToClient(roomId, {
-                    type: 'showEmoji',
-                    emoji
-                });
+                try {
+                    sendToolCallToClient(roomId, { type: 'showEmoji', emoji });
+                } catch (error) {
+                    console.error(`❌ [Emoji] ${error.message}`);
+                } finally {
+                    toolCallSessionMap.delete(toolCallId);
+                }
             })();
         }
         
-        const result = `${word}: ${definition} Example: "The ${word} is fun!"`;
         return {
-            content: [{ type: 'text', text: result }],
+            content: [{ type: 'text', text: `${word}: ${definition} Example: "The ${word} is fun!"` }],
             details: { word, definition, status: 'started' }
         };
     }
@@ -211,25 +226,24 @@ const pronunciationTool = {
     },
     execute: async (toolCallId, params, signal, onUpdate) => {
         const { text } = params;
+        const roomId = validateRoomId(toolCallId);
         
         const score = Math.floor(Math.random() * 20) + 80;
         const feedback = score >= 95 ? "Perfect! 🌟" : score >= 90 ? "Excellent! 👏" : "Great job! 👍";
         const starCount = score >= 95 ? 3 : score >= 90 ? 2 : 1;
         
-        const roomId = toolCallSessionMap.get(toolCallId);
-        if (!roomId) {
-            throw new Error('Room not found');
-        }
         (async () => {
-            sendToolCallToClient(roomId, {
-                type: 'showStars',
-                count: starCount
-            });
+            try {
+                sendToolCallToClient(roomId, { type: 'showStars', count: starCount });
+            } catch (error) {
+                console.error(`❌ [Stars] ${error.message}`);
+            } finally {
+                toolCallSessionMap.delete(toolCallId);
+            }
         })();
         
-        const result = `Pronunciation score: ${score}/100 - ${feedback}`;
         return {
-            content: [{ type: 'text', text: result }],
+            content: [{ type: 'text', text: `Pronunciation score: ${score}/100 - ${feedback}` }],
             details: { score, feedback, status: 'started' }
         };
     }
@@ -247,22 +261,20 @@ const showEmojiTool = {
     },
     execute: async (toolCallId, params, signal, onUpdate) => {
         const { emoji } = params;
-        
-        const roomId = toolCallSessionMap.get(toolCallId);
-        if (!roomId) {
-            throw new Error('Room not found');
-        }
+        const roomId = validateRoomId(toolCallId);
         
         (async () => {
-            sendToolCallToClient(roomId, {
-                type: 'showEmoji',
-                emoji
-            });
+            try {
+                sendToolCallToClient(roomId, { type: 'showEmoji', emoji });
+            } catch (error) {
+                console.error(`❌ [Emoji] ${error.message}`);
+            } finally {
+                toolCallSessionMap.delete(toolCallId);
+            }
         })();
         
-        const result = `Look! ${emoji}! I'm showing it to you now.`;
         return {
-            content: [{ type: 'text', text: result }],
+            content: [{ type: 'text', text: `Look! ${emoji}! I'm showing it to you now.` }],
             details: { emoji, status: 'started' }
         };
     }
@@ -281,55 +293,44 @@ const showImageTool = {
     },
     execute: async (toolCallId, params, signal, onUpdate) => {
         const { query, orientation = 'landscape' } = params;
-        
-        // 在异步操作前捕获 roomId，避免被 afterToolCall 清理
-        const roomId = toolCallSessionMap.get(toolCallId);
-        if (!roomId) {
-            throw new Error('Room not found');
-        }
+        const roomId = validateRoomId(toolCallId);
         
         (async () => {
-            const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
-            const unsplashUrl = process.env.UNSPLASH_API_URL || 'https://api.unsplash.com';
-            
-            let imageUrl = null;
-            let photographer = 'Unknown';
-            
-            if (unsplashKey) {
-                try {
-                    const searchUrl = `${unsplashUrl}/search/photos?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=1&client_id=${unsplashKey}`;
-                    const response = await fetch(searchUrl);
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.results && data.results.length > 0) {
-                            const img = data.results[0];
-                            imageUrl = img.urls.regular || img.urls.small || img.urls.thumb;
-                            photographer = img.user?.name || 'Unknown';
-                       }
+            try {
+                const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+                let imageUrl = null;
+                let photographer = 'Unknown';
+                
+                if (unsplashKey) {
+                    try {
+                        const response = await fetch(`${process.env.UNSPLASH_API_URL || 'https://api.unsplash.com'}/search/photos?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=1&client_id=${unsplashKey}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.results?.length > 0) {
+                                const img = data.results[0];
+                                imageUrl = img.urls.regular || img.urls.small || img.urls.thumb;
+                                photographer = img.user?.name || 'Unknown';
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`❌ [Image] Unsplash: ${error.message}`);
                     }
-                } catch (error) {
-                    console.error('❌ Unsplash API error:', error.message);
                 }
+                
+                if (!imageUrl) {
+                    imageUrl = `https://picsum.photos/seed/${encodeURIComponent(query.toLowerCase())}/800/600`;
+                }
+                
+                sendToolCallToClient(roomId, { type: 'showImage', url: imageUrl, caption: query, photographer });
+            } catch (error) {
+                console.error(`❌ [Image] ${error.message}`);
+            } finally {
+                toolCallSessionMap.delete(toolCallId);
             }
-            
-            if (!imageUrl) {
-                const seed = encodeURIComponent(query.toLowerCase());
-                imageUrl = `https://picsum.photos/seed/${seed}/800/600`;
-                console.log(`🖼️ Using Picsum fallback for: "${query}"`);
-            }
-            
-            sendToolCallToClient(roomId, {
-                type: 'showImage',
-                url: imageUrl,
-                caption: query,
-                photographer
-            });
         })();
         
-        const result = `I'm finding a picture of ${query} for you! It should appear in a moment.`;
         return {
-            content: [{ type: 'text', text: result }],
+            content: [{ type: 'text', text: `I'm finding a picture of ${query} for you! It should appear in a moment.` }],
             details: { query, orientation, status: 'searching' }
         };
     }
@@ -362,18 +363,9 @@ function getOrCreateAgent(sessionId, systemPrompt) {
                 tools: TOOLS,
                 messages: []
             },
-            beforeToolCall: (toolCall) => {
-                // 在工具调用前，记录 toolCallId 与 sessionId 的映射关系
-                if (toolCall.id && sessionId) {
-                    toolCallSessionMap.set(toolCall.id, sessionId);
-                    console.log(`🔗 [beforeToolCall] Mapped toolCallId=${toolCall.id} → sessionId=${sessionId}`);
-                }
-            },
-            afterToolCall: (toolCall, result) => {
-                // 在工具调用后，清理映射关系（可选，根据需要决定是否保留）
-                if (toolCall.id) {
-                    toolCallSessionMap.delete(toolCall.id);
-                    console.log(`🗑️ [afterToolCall] Cleaned toolCallId=${toolCall.id} → sessionId=${sessionId}`);
+            beforeToolCall: (context, signal) => {
+                if (context.toolCall.id && sessionId) {
+                    toolCallSessionMap.set(context.toolCall.id, sessionId);
                 }
             }
         });
@@ -452,7 +444,6 @@ app.post('/v1/chat/completions', async (req, res) => {
     // 记录请求
     console.log(`\n📥 [${requestId}] POST /v1/chat/completions`);
     console.log(`   SessionId: ${req.query.session_id || 'N/A'}`);
-    console.log(`   Stream: ${req.body.stream || false}`);
     console.log(`   Messages:`, JSON.stringify(req.body.messages, null, 2));
     
     const {
@@ -475,9 +466,8 @@ app.post('/v1/chat/completions', async (req, res) => {
             const characterConfig = getCharacterConfig(character, 'component');
             const combinedConfig = combineCharacterAndScenePrompt(characterConfig, sceneId);
             systemPrompt = combinedConfig.systemPrompt;
-            console.log(`📝 [${requestId}] Using dynamic systemPrompt for character=${character}, scene=${sceneId}`);
         } catch (error) {
-            console.warn(`⚠️ [${requestId}] Failed to get dynamic systemPrompt, using default:`, error.message);
+            console.warn(`⚠️ [${requestId}] Failed to get dynamic systemPrompt: ${error.message}`);
         }
     }
     
@@ -499,64 +489,21 @@ app.post('/v1/chat/completions', async (req, res) => {
             res.setHeader('X-Request-ID', requestId);
             
             let assistantMessage = '';
-            let eventCount = 0;
-            let toolCallCount = 0;
-            
-            console.log(`🔍 [${requestId}] Agent state before prompt:`, {
-                messages: agent.state.messages?.length || 0,
-                systemPrompt: agent.state.systemPrompt?.substring(0, 100) + '...'
-            });
-            
-            // 调试：打印 agent 上下文
-            console.log(`🔍 [${requestId}] Agent context before prompt:`, {
-                messages: agent.state.messages?.map(m => ({
-                    role: m.role,
-                    content: typeof m.content === 'string' ? m.content.substring(0, 100) : (Array.isArray(m.content) ? m.content.length + ' parts' : 'unknown'),
-                    toolCallId: m.toolCallId,
-                    toolName: m.toolName
-                }))
-            });
-            
             const unsubscribe = agent.subscribe((event) => {
-                eventCount++;
-                console.log(`📡 [${requestId}] Event #${eventCount}:`, JSON.stringify({
-                    type: event.type,
-                    assistantMessageEvent: event.assistantMessageEvent ? {
-                        type: event.assistantMessageEvent.type,
-                        delta: event.assistantMessageEvent.delta?.substring(0, 50)
-                    } : null,
-                    toolCallEvent: event.toolCallEvent ? {
-                        name: event.toolCallEvent.name,
-                        args: event.toolCallEvent.args
-                    } : null
-                }));
-                
                 if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
                     const delta = event.assistantMessageEvent.delta;
                     assistantMessage += delta;
-                    console.log(`✍️ [${requestId}] Text delta (${delta.length} chars): "${delta.substring(0, 50)}${delta.length > 50 ? '...' : ''}"`);
-                    
                     res.write(`data: ${JSON.stringify({
                         id: requestId,
                         object: 'chat.completion.chunk',
                         created: timestamp,
                         model: LLM_MODEL,
-                        choices: [{
-                            index: 0,
-                            finish_reason: null,
-                            delta: { content: delta }
-                        }]
+                        choices: [{ index: 0, finish_reason: null, delta: { content: delta } }]
                     })}\n\n`);
                 }
                 
-                if (event.type === 'tool_call' || event.toolCallEvent) {
-                    toolCallCount++;
-                    console.log(`🛠️ [${requestId}] Tool call #${toolCallCount}:`, event.toolCallEvent?.name || 'unknown');
-                }
             });
             
-            console.log(`🚀 [${requestId}] Calling agent.prompt with: "${userMessage.content.substring(0, 100)}${userMessage.content.length > 100 ? '...' : ''}"`);
-
             if (agent.state.isStreaming) {
                 await agent.steer(userMessage.content);
             } else {
@@ -564,18 +511,9 @@ app.post('/v1/chat/completions', async (req, res) => {
             }
             unsubscribe();
             
-            console.log(`📊 [${requestId}] Agent state after prompt:`, {
-                events: eventCount,
-                toolCalls: toolCallCount,
-                finalMessage: assistantMessage.length,
-                messages: agent.state.messages?.length || 0
-            });
-            
             const duration = Date.now() - startTime;
-            console.log(`✅ [${requestId}] Stream response in ${duration}ms`);
-            console.log(`   Assistant message length: ${assistantMessage.length} chars`);
             if (assistantMessage.length === 0) {
-                console.warn(`⚠️ [${requestId}] WARNING: Empty response! Check events above.`);
+                console.warn(`⚠️ [${requestId}] Empty response`);
             }
             
             res.write(`data: ${JSON.stringify({
@@ -605,8 +543,6 @@ app.post('/v1/chat/completions', async (req, res) => {
             unsubscribe();
             
             const duration = Date.now() - startTime;
-            console.log(`✅ [${requestId}] Response in ${duration}ms`);
-            console.log(`   Assistant message: ${assistantMessage.substring(0, 200)}${assistantMessage.length > 200 ? '...' : ''}`);
             
             res.json({
                 id: requestId,
