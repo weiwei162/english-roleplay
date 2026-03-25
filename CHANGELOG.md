@@ -18,7 +18,8 @@
 #### 服务端
 - ✅ `index-join-ai.js` - AI 加入房间模式（主入口）
 - ✅ `volc-start-voicechat.js` - StartVoiceChat API 客户端
-- ✅ `token-generator-official.js` - 官方 Token 生成
+- ✅ `token-generator.js` - Token 生成（基于官方 AccessToken.js）
+- ✅ `AccessToken.js` - 火山引擎官方 Token 库
 - ✅ `test-integration.js` - 集成测试
 
 #### 前端

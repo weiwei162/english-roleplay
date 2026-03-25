@@ -5,12 +5,8 @@
 ### 1. 构建镜像
 
 ```bash
-# 构建主服务镜像
+# 构建单服务镜像（推荐）
 docker build -t english-roleplay:latest .
-
-# 或分别构建
-docker build -f Dockerfile.pi-agent -t english-roleplay-pi-agent:latest .
-docker build -f Dockerfile.main -t english-roleplay-main:latest .
 ```
 
 ### 2. 运行容器
@@ -21,17 +17,13 @@ docker-compose up -d
 
 # 或单独运行
 docker run -d \
-  --name pi-agent \
-  -p 3001:3001 \
-  --env-file .env \
-  english-roleplay-pi-agent:latest
-
-docker run -d \
-  --name main-server \
+  --name english-roleplay \
   -p 3000:3000 \
+  -p 3443:3443 \
   --env-file .env \
-  --link pi-agent \
-  english-roleplay-main:latest
+  -v ./server/logs:/app/logs \
+  -v ./server/ssl:/app/ssl:ro \
+  english-roleplay:latest
 ```
 
 ### 3. 查看状态
@@ -41,42 +33,65 @@ docker run -d \
 docker-compose ps
 
 # 查看日志
-docker-compose logs -f pi-agent
-docker-compose logs -f main-server
+docker-compose logs -f english-roleplay
 ```
 
 ---
 
 ## Dockerfile
 
-### 主服务 Dockerfile
+### 单服务 Dockerfile（实际使用）
 
 ```dockerfile
-FROM node:20-alpine
+# Main Server Dockerfile
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# 复制 package 文件
-COPY package*.json ./
+# 复制 server 目录的 package 文件
+COPY server/package*.json ./
 
-# 安装依赖
-RUN npm ci --only=production
+# 安装所有依赖
+RUN npm ci
 
-# 复制源代码
-COPY . .
+# 复制 server 目录的所有文件
+COPY server/ ./server/
+
+# 复制前端文件
+COPY frontend/ ./frontend/
+
+# 生产阶段
+FROM node:22-alpine
+
+WORKDIR /app
+
+# 创建非 root 用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# 从构建阶段复制所有文件
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/server ./server
+COPY --from=builder /app/frontend ./frontend
+
+# 创建日志和 SSL 目录
+RUN mkdir -p /app/logs /app/ssl && chown -R nodejs:nodejs /app
+
+# 切换到非 root 用户
+USER nodejs
 
 # 暴露端口
-EXPOSE 3000
+EXPOSE 3000 3443
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 # 启动命令
-CMD ["node", "index-join-ai.js"]
+CMD ["node", "server/index-join-ai.js"]
 ```
 
-### pi-agent Dockerfile
+**注意：** pi-agent 已集成到主服务中，无需单独部署。
 
 ```dockerfile
 FROM node:20-alpine

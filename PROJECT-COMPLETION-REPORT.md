@@ -98,15 +98,15 @@ scene_hint         // 场景提示
 ### 3. 文档系统 ✅
 
 #### 快速开始
-- [x] QUICKSTART-PI-AGENT.md - 真实 LLM 配置 ⭐
+- [x] QUICKSTART.md - 5 分钟快速启动 ⭐
 - [x] START.md - 火山引擎启动
 - [x] HTTPS-CONFIG.md - HTTPS 配置
 
 #### 开发文档
-- [x] PI-AGENT-REAL-GUIDE.md - 真实 Agent 详细指南 ⭐
-- [x] PI-AGENT-INTEGRATION.md - CustomLLM 集成
 - [x] CHARACTER-MOVE-FEATURE.md - 角色移动功能
-- [x] FINAL-SUMMARY.md - 完整开发总结 ⭐
+- [x] API-CONFIG.md - 前端配置 API
+- [x] INTEGRATION-FLOW.md - 集成流程
+- [x] CORRECT-FLOW.md - 正确集成流程 ⭐
 
 #### 测试部署
 - [x] TESTING-CHECKLIST.md - 完整测试清单 ⭐

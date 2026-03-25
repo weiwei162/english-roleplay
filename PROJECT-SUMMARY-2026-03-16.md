@@ -219,7 +219,8 @@
 |------|------|------|------|
 | `server/index-join-ai.js` | ~270 | AI 加入房间模式服务端 | ✅ 核心 |
 | `server/volc-start-voicechat.js` | ~370 | StartVoiceChat API 客户端 | ✅ 核心 |
-| `server/token-generator-official.js` | ~150 | 官方 Token 生成 | ✅ |
+| `server/token-generator.js` | ~150 | Token 生成（基于 AccessToken.js） | ✅ |
+| `server/AccessToken.js` | ~180 | 火山引擎官方 Token 库 | ✅ |
 | `server/index-start-voicechat.js` | ~200 | 旧流程服务端 | ⚠️ 保留 |
 | `server/test-integration.js` | ~180 | 集成测试脚本 | ✅ |
 | `server/.env.example` | ~30 | 配置模板 | ✅ |

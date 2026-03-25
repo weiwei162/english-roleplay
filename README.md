@@ -30,7 +30,7 @@ cp .env.example .env
 # 访问：http://localhost:3000
 ```
 
-详见：[`QUICKSTART-PI-AGENT.md`](QUICKSTART-PI-AGENT.md)
+详见：[`QUICKSTART.md`](QUICKSTART.md)
 
 ### 方式 2: 火山引擎端到端
 
@@ -145,30 +145,40 @@ npm start
 
 ```
 english-roleplay/
-├── START.md                  # ⭐ 快速启动指南
 ├── README.md                 # 本文档
-├── index.html                # 主页面
-├── js/
-│   ├── app.js                # 应用主逻辑
-│   ├── startvoicechat-client.js  # StartVoiceChat 客户端
-│   ├── characters.js         # 角色配置
-│   └── scenes.js             # 场景配置
-├── css/
-│   └── style.css             # 样式
-├── server/
-│   ├── index-join-ai.js      # ⭐ 服务端入口
-│   ├── volc-start-voicechat.js     # API 客户端
-│   ├── token-generator-official.js # Token 生成
-│   ├── test-integration.js   # 测试脚本
-│   └── .env.example          # 配置模板
-└── docs/
-    ├── README-FINAL.md       # 项目总结
-    ├── CORRECT-FLOW.md       # 正确流程 ⭐
-    ├── API-CONFIG.md         # 配置 API
-    ├── INTEGRATION-FLOW.md   # 集成流程
-    ├── QUICK-REFERENCE.md    # 快速参考
-    ├── DEPLOY-TEST.md        # 部署测试
-    └── STARTVOICECHAT-SETUP.md # 配置指南
+├── QUICKSTART.md             # ⭐ 5 分钟快速启动
+├── START.md                  # 火山引擎启动指南
+├── CORRECT-FLOW.md           # ⭐ 正确集成流程
+├── frontend/                 # 前端目录
+│   ├── index.html            # 主页面
+│   ├── js/
+│   │   ├── app.js            # 应用主逻辑
+│   │   ├── startvoicechat-client.js  # StartVoiceChat 客户端
+│   │   ├── characters.js     # 角色配置
+│   │   ├── scenes.js         # 场景配置
+│   │   ├── auth-client.js    # 认证客户端
+│   │   ├── conversations.js  # 对话管理
+│   │   ├── animations.js     # 动画效果
+│   │   ├── particles.js      # 粒子效果
+│   │   └── demo-features.js  # 演示功能
+│   ├── css/
+│   │   └── style.css         # 样式
+│   ├── assets/               # 资源文件
+│   ├── package.json          # 前端依赖（可选 Vite）
+│   └── vite.config.js        # Vite 配置（可选）
+└── server/
+    ├── index-join-ai.js      # ⭐ 服务端入口
+    ├── volc-start-voicechat.js     # StartVoiceChat 客户端
+    ├── token-generator.js    # ⭐ RTC Token 生成（基于 AccessToken.js）
+    ├── AccessToken.js        # 火山引擎官方 Token 库
+    ├── prompts.js            # 提示词管理
+    ├── auth.js               # 用户认证
+    ├── users.json            # 用户数据
+    ├── test-integration.js   # 集成测试
+    ├── .env.example          # 配置模板
+    ├── start.sh              # 启动脚本
+    ├── configure.sh          # 配置向导
+    └── generate-ssl.sh       # SSL 证书生成
 ```
 
 ---
@@ -176,22 +186,27 @@ english-roleplay/
 ## 📚 文档索引
 
 ### 新手必读 ⭐
-- [`QUICKSTART-PI-AGENT.md`](QUICKSTART-PI-AGENT.md) - **使用真实 LLM (推荐)**
-- [`START.md`](START.md) - 5 分钟快速启动（火山引擎）
-- [`FINAL-SUMMARY.md`](FINAL-SUMMARY.md) - **完整开发总结**
+- [`QUICKSTART.md`](QUICKSTART.md) - **5 分钟快速启动（推荐）**
+- [`START.md`](START.md) - 火山引擎详细启动指南
+- [`CORRECT-FLOW.md`](CORRECT-FLOW.md) - **正确集成流程**
 
 ### 开发文档
-- [`PI-AGENT-REAL-GUIDE.md`](PI-AGENT-REAL-GUIDE.md) - 真实 Agent 详细指南
-- [`PI-AGENT-INTEGRATION.md`](PI-AGENT-INTEGRATION.md) - CustomLLM 集成
 - [`CHARACTER-MOVE-FEATURE.md`](CHARACTER-MOVE-FEATURE.md) - 角色移动功能
 - [`API-CONFIG.md`](API-CONFIG.md) - 前端配置 API
 - [`INTEGRATION-FLOW.md`](INTEGRATION-FLOW.md) - 集成流程
 - [`QUICK-REFERENCE.md`](QUICK-REFERENCE.md) - 快速参考
+- [`ARCHITECTURE-FLOW.md`](ARCHITECTURE-FLOW.md) - 架构说明
 
 ### 部署运维
 - [`DEPLOY-TEST.md`](DEPLOY-TEST.md) - 部署与测试
-- [`STARTVOICECHAT-SETUP.md`](STARTVOICECHAT-SETUP.md) - 配置指南
+- [`DEPLOY-DOCKER.md`](DEPLOY-DOCKER.md) - Docker 部署
 - [`HTTPS-CONFIG.md`](HTTPS-CONFIG.md) - HTTPS 配置
+- [`CONFIG-GUIDE.md`](CONFIG-GUIDE.md) - 配置指南
+
+### 项目文档
+- [`PROJECT-SUMMARY-2026-03-16.md`](PROJECT-SUMMARY-2026-03-16.md) - 项目总结
+- [`CODE-REVIEW-2026-03-21.md`](CODE-REVIEW-2026-03-21.md) - 代码审查
+- [`CHANGELOG.md`](CHANGELOG.md) - 更新日志
 
 ---
 
@@ -247,6 +262,18 @@ curl http://localhost:3000/health
 ---
 
 ## 📝 更新日志
+
+### v3.2.1 (2026-03-25) - 代码清理
+- 🗑️ 删除冗余测试文件（test-accesstoken.js, test-token.js, compare-tokens.js 等）
+- 🗑️ 删除备份文件（volc-rtc-client.js.bak）
+- 🗑️ 删除冗余实现（token-generator-official.js）
+- 📝 更新文档，移除不存在的文件引用
+- 📝 更新项目结构，反映实际目录布局
+
+### v3.2.0 - 支持真实 LLM
+- ✅ 集成 pi-agent-core，支持 OpenAI/Claude/Gemini/Ollama
+- ✅ 内置教学工具（字典、发音评分、场景提示、图片显示）
+- ✅ 改进工具调用错误处理和资源清理
 
 ### v3.1.0 (2026-03-16) - 正确流程版
 - ✅ 前端完全控制房间

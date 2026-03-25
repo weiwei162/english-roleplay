@@ -286,7 +286,8 @@ english-roleplay/
 ├── server/
 │   ├── index-join-ai.js    # ⭐ 服务端入口
 │   ├── volc-start-voicechat.js   # API 客户端
-│   ├── token-generator-official.js  # Token 生成
+│   ├── token-generator.js           # Token 生成（基于 AccessToken.js）
+│   ├── AccessToken.js               # 火山引擎官方 Token 库
 │   ├── test-integration.js  # 测试脚本
 │   └── .env.example        # 配置模板
 └── docs/                   # 文档

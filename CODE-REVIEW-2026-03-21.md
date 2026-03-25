@@ -161,7 +161,7 @@
 |------|------|------|
 | JWT 认证 | ✅ | 30 天有效期，密码 SHA256 哈希 |
 | CORS 配置 | ✅ | express/cors 中间件 |
-| Token 生成 | ✅ | 官方 token-generator-official.js |
+| Token 生成 | ✅ | token-generator.js（基于 AccessToken.js） |
 | 环境变量 | ✅ | .env 文件管理敏感配置 |
 | 权限控制 | ✅ | authMiddleware 保护 API |
 
@@ -186,7 +186,8 @@
 | `server/index-join-ai.js` | ✅ | 主服务入口 |
 | `server/volc-start-voicechat.js` | ✅ | 火山 API 客户端 |
 | `server/auth.js` | ✅ | 认证模块 |
-| `server/token-generator-official.js` | ✅ | Token 生成 |
+| `server/token-generator.js` | ✅ | Token 生成 |
+| `server/AccessToken.js` | ✅ | 官方 Token 库 |
 | `server/prompts.js` | ✅ | 角色/场景提示词 |
 | `frontend/js/app.js` | ✅ | 前端主逻辑 |
 | `frontend/js/startvoicechat-client.js` | ✅ | RTC 客户端 |
@@ -224,9 +225,15 @@
 | 测试文件 | 测试内容 | 状态 |
 |---------|---------|------|
 | `server/test-integration.js` | 集成测试 | ✅ |
-| `server/test-token.js` | Token 生成测试 | ✅ |
-| `server/test-voicechat-token.js` | VoiceChat Token 测试 | ✅ |
-| `server/test-accesstoken.js` | AccessToken 测试 | ✅ |
+
+### 已清理（2026-03-25）
+
+以下测试文件已删除（冗余或过时）：
+- `server/test-token.js` - 被 test-integration.js 替代
+- `server/test-accesstoken.js` - 被 test-integration.js 替代
+- `server/test-voicechat-token.js` - 被 test-integration.js 替代
+- `server/compare-tokens.js` - 调试工具
+- `server/diagnose-token.js` - 调试工具
 
 ### 缺失测试
 

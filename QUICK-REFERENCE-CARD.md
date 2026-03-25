@@ -97,20 +97,28 @@ git add -A && git commit -m "message" && git push origin master
 
 ```
 english-roleplay/
-├── js/                        # 前端代码
-│   ├── app.js                 # 主应用逻辑
-│   ├── scenes.js              # 场景数据
-│   └── startvoicechat-client.js  # RTC 客户端
+├── frontend/                  # 前端目录
+│   ├── index.html             # 主页面
+│   ├── js/                    # 前端代码
+│   │   ├── app.js             # 主应用逻辑
+│   │   ├── scenes.js          # 场景数据
+│   │   └── startvoicechat-client.js  # RTC 客户端
+│   └── css/
+│       └── style.css          # 样式
 │
 ├── server/                    # 后端代码
-│   └── (pi-agent 已集成到主服务)
-│   ├── index-join-ai.js       # 主服务
+│   ├── index-join-ai.js       # 主服务（pi-agent 已集成）
+│   ├── token-generator.js     # Token 生成
+│   ├── AccessToken.js         # 官方 Token 库
+│   ├── volc-start-voicechat.js # StartVoiceChat 客户端
+│   ├── prompts.js             # 提示词管理
+│   ├── auth.js                # 用户认证
 │   └── .env.example           # 环境变量模板
 │
 └── 文档/
-    ├── QUICKSTART-PI-AGENT.md # 快速开始 ⭐
-    ├── FINAL-SUMMARY.md       # 完整总结 ⭐
-    ├── TESTING-CHECKLIST.md   # 测试清单
+    ├── QUICKSTART.md          # 5 分钟快速开始 ⭐
+    ├── START.md               # 火山引擎启动指南
+    ├── CORRECT-FLOW.md        # 正确集成流程 ⭐
     └── DEPLOY-DOCKER.md       # Docker 部署
 ```
 
@@ -198,13 +206,13 @@ moveCharacterTo(50, 60, { jump: true });
 
 ```bash
 # 启用调试日志
-DEBUG=pi-agent* npm run start:pi-agent
+DEBUG=pi-agent* npm start
 
 # 查看活跃会话
-curl http://localhost:3001/health | jq .activeSessions
+curl http://localhost:3000/health | jq .activeSessions
 
-# 测试工具调用
-node server/test-pi-agent.js
+# 运行集成测试
+npm test
 ```
 
 ---
@@ -212,13 +220,14 @@ node server/test-pi-agent.js
 ## 文档索引
 
 ### 必读 ⭐
-- [QUICKSTART-PI-AGENT.md](QUICKSTART-PI-AGENT.md) - 5 分钟快速开始
-- [FINAL-SUMMARY.md](FINAL-SUMMARY.md) - 完整功能总结
+- [QUICKSTART.md](QUICKSTART.md) - 5 分钟快速开始
+- [CORRECT-FLOW.md](CORRECT-FLOW.md) - 正确集成流程
+- [START.md](START.md) - 火山引擎启动指南
 
 ### 开发
-- [PI-AGENT-REAL-GUIDE.md](PI-AGENT-REAL-GUIDE.md) - 真实 Agent 指南
 - [CHARACTER-MOVE-FEATURE.md](CHARACTER-MOVE-FEATURE.md) - 角色移动
-- [TESTING-CHECKLIST.md](TESTING-CHECKLIST.md) - 测试清单
+- [API-CONFIG.md](API-CONFIG.md) - 前端配置 API
+- [INTEGRATION-FLOW.md](INTEGRATION-FLOW.md) - 集成流程
 
 ### 部署
 - [DEPLOY-DOCKER.md](DEPLOY-DOCKER.md) - Docker 部署
