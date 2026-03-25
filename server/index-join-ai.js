@@ -649,11 +649,21 @@ app.get('/api/characters', (req, res) => {
 app.get('/api/token', authMiddleware, (req, res) => {
     try {
         const { roomId, uid } = req.query;
+        const currentUserId = req.user.username;
         
         if (!roomId || !uid) {
             return res.status(400).json({ 
                 error: 'roomId and uid required',
                 success: false
+            });
+        }
+        
+        // 用户隔离：检查房间是否属于当前用户
+        const session = sessions.get(roomId);
+        if (session && session.userId !== currentUserId) {
+            return res.status(403).json({ 
+                success: false, 
+                error: '无权访问其他用户的房间' 
             });
         }
         
@@ -666,8 +676,7 @@ app.get('/api/token', authMiddleware, (req, res) => {
             86400 // 24 小时
         );
         
-        const username = req.user ? req.user.username : 'anonymous';
-        console.log('🔑 Generated token for:', { roomId, uid, user: username });
+        console.log('🔑 Generated token for:', { roomId, uid, user: currentUserId });
         
         res.json({
             success: true,
@@ -694,6 +703,15 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
     
     if (!roomId || !character || !sceneId || !targetUserId) {
         return res.status(400).json({ error: 'roomId, character, sceneId, and targetUserId required' });
+    }
+    
+    // 用户隔离：检查会话是否已存在且属于其他用户
+    const existingSession = sessions.get(roomId);
+    if (existingSession && existingSession.userId !== userId) {
+        return res.status(403).json({ 
+            success: false, 
+            error: '该房间已被其他用户占用' 
+        });
     }
     
     // targetUserId: 真人用户 ID（前端传入）
@@ -814,9 +832,19 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
 
 app.post('/api/leave-room', authMiddleware, async (req, res) => {
     const { roomId, taskId } = req.body;
+    const currentUserId = req.user.username;
     
     if (!roomId || !taskId) {
         return res.status(400).json({ error: 'roomId and taskId required' });
+    }
+    
+    // 用户隔离：检查会话是否属于当前用户
+    const session = sessions.get(roomId);
+    if (session && session.userId !== currentUserId) {
+        return res.status(403).json({ 
+            success: false, 
+            error: '无权操作其他用户的会话' 
+        });
     }
     
     try {
@@ -827,7 +855,7 @@ app.post('/api/leave-room', authMiddleware, async (req, res) => {
         });
         
         sessions.delete(roomId);
-        console.log(`✅ AI left room: ${roomId}`);
+        console.log(`✅ AI left room: ${roomId} (user: ${currentUserId})`);
         
         res.json({ success: true, message: 'AI left room successfully' });
     } catch (error) {
