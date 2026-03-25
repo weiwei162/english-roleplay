@@ -1,5 +1,60 @@
 # English Roleplay - 更新日志
 
+## v3.2.2 (2026-03-25) - 文档精简 ⭐
+
+### 🧹 文档清理
+
+**删除冗余文档（7 个）**：
+- `QUICKSTART-STARTVOICECHAT.md` → 合并到 `QUICKSTART.md`
+- `README-FINAL.md` → 内容过时
+- `CONFIG-GUIDE.md` → `.env.example` 已足够详细
+- `API-CONFIG.md` → 内容简单，无需单独文档
+- `INTEGRATION-FLOW.md` → 与 `INTEGRATION-GUIDE.md` 重复
+- `DEPLOY-TEST.md` → 内容已合并到 `START.md`
+- `STARTVOICECHAT-SETUP.md` → 内容已合并到 `START.md`
+
+**删除历史总结（2 个）**：
+- `PROJECT-SUMMARY-2026-03-16.md`
+- `PROJECT-COMPLETION-REPORT.md`
+
+**删除未使用的 Vite 配置（4 个）**：
+- `frontend/main.js` (仅一行注释)
+- `frontend/package.json` (未实际使用)
+- `frontend/vite.config.js` (未实际使用)
+- `frontend/.gitignore`
+
+### 🔧 代码修复
+
+- ✅ 修复 `test-integration.js` 使用旧 API (`/api/create-room` → `/api/join-ai`)
+- ✅ 更新 `README.md` 文档索引
+
+### 📊 统计
+
+- 文档从 27 个减少到 **19 个**
+- 代码减少 ~800 行
+- 项目结构更清晰
+
+---
+
+## v3.2.1 (2026-03-25) - 代码清理
+
+### 🧹 冗余代码清理
+
+**删除测试文件（5 个）**：
+- `test-accesstoken.js`, `test-token.js`, `test-voicechat-token.js`
+- `compare-tokens.js`, `diagnose-token.js`
+
+**删除备份和冗余实现（2 个）**：
+- `volc-rtc-client.js.bak`
+- `token-generator-official.js`
+
+**保留核心文件**：
+- ✅ `AccessToken.js` - 火山引擎官方 Token 库
+- ✅ `token-generator.js` - Token 生成封装
+- ✅ `test-integration.js` - 唯一集成测试
+
+---
+
 ## v3.1.0 (2026-03-16) - 正确流程版 ⭐
 
 ### 🎉 重大变更

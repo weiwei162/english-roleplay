@@ -211,7 +211,7 @@
 | `README.md` | ✅ | 项目说明 |
 | `ARCHITECTURE-FLOW.md` | ✅ | 架构流程 ⭐ |
 | `QUICKSTART.md` | ✅ | 快速开始 |
-| `CONFIG-GUIDE.md` | ✅ | 配置指南 |
+| `.env.example` | ✅ | 配置模板（详细注释） |
 | `DEPLOY-DOCKER.md` | ✅ | Docker 部署 |
 | `HTTPS-CONFIG.md` | ✅ | HTTPS 配置 |
 | `TTS-VOICE-CHECK.md` | ✅ | 音色检查报告 |

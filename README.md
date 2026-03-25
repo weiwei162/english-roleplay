@@ -186,27 +186,25 @@ english-roleplay/
 ## 📚 文档索引
 
 ### 新手必读 ⭐
-- [`QUICKSTART.md`](QUICKSTART.md) - **5 分钟快速启动（推荐）**
-- [`START.md`](START.md) - 火山引擎详细启动指南
+- [`QUICKSTART.md`](QUICKSTART.md) - **5 分钟快速启动**
+- [`START.md`](START.md) - 火山引擎详细指南
 - [`CORRECT-FLOW.md`](CORRECT-FLOW.md) - **正确集成流程**
 
 ### 开发文档
 - [`CHARACTER-MOVE-FEATURE.md`](CHARACTER-MOVE-FEATURE.md) - 角色移动功能
-- [`API-CONFIG.md`](API-CONFIG.md) - 前端配置 API
-- [`INTEGRATION-FLOW.md`](INTEGRATION-FLOW.md) - 集成流程
 - [`QUICK-REFERENCE.md`](QUICK-REFERENCE.md) - 快速参考
 - [`ARCHITECTURE-FLOW.md`](ARCHITECTURE-FLOW.md) - 架构说明
+- [`EFFECT-ANALYSIS.md`](EFFECT-ANALYSIS.md) - 效果分析
+- [`TTS-VOICE-CHECK.md`](TTS-VOICE-CHECK.md) - TTS 语音检查
 
 ### 部署运维
-- [`DEPLOY-TEST.md`](DEPLOY-TEST.md) - 部署与测试
 - [`DEPLOY-DOCKER.md`](DEPLOY-DOCKER.md) - Docker 部署
 - [`HTTPS-CONFIG.md`](HTTPS-CONFIG.md) - HTTPS 配置
-- [`CONFIG-GUIDE.md`](CONFIG-GUIDE.md) - 配置指南
 
-### 项目文档
-- [`PROJECT-SUMMARY-2026-03-16.md`](PROJECT-SUMMARY-2026-03-16.md) - 项目总结
-- [`CODE-REVIEW-2026-03-21.md`](CODE-REVIEW-2026-03-21.md) - 代码审查
+### 其他
 - [`CHANGELOG.md`](CHANGELOG.md) - 更新日志
+- [`CODE-REVIEW-2026-03-21.md`](CODE-REVIEW-2026-03-21.md) - 代码审查
+- [`REFACTOR-2026-03-18.md`](REFACTOR-2026-03-18.md) - 重构记录
 
 ---
 

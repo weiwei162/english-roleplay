@@ -114,7 +114,7 @@ async function runTests() {
         log(colors.yellow, '\n📋 测试 3: 创建 AI 房间');
         roomId = `test_room_${Date.now()}`;
         
-        const createRoom = await request('/api/create-room', {
+        const joinAI = await request('/api/join-ai', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: {

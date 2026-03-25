@@ -226,8 +226,7 @@ npm test
 
 ### 开发
 - [CHARACTER-MOVE-FEATURE.md](CHARACTER-MOVE-FEATURE.md) - 角色移动
-- [API-CONFIG.md](API-CONFIG.md) - 前端配置 API
-- [INTEGRATION-FLOW.md](INTEGRATION-FLOW.md) - 集成流程
+- [CORRECT-FLOW.md](CORRECT-FLOW.md) - 正确集成流程
 
 ### 部署
 - [DEPLOY-DOCKER.md](DEPLOY-DOCKER.md) - Docker 部署

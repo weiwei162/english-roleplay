@@ -315,11 +315,10 @@ date
 
 | 文档 | 用途 |
 |------|------|
-| `INTEGRATION-FLOW.md` | 详细集成流程 |
-| `INTEGRATION-GUIDE.md` | 前后端集成指南 |
-| `DEPLOY-TEST.md` | 部署与测试 |
-| `STARTVOICECHAT-SETUP.md` | 配置指南 |
-| `QUICKSTART-STARTVOICECHAT.md` | 快速启动 |
+| `START.md` | 火山引擎详细指南 |
+| `CORRECT-FLOW.md` | 正确集成流程 |
+| `DEPLOY-DOCKER.md` | Docker 部署 |
+| `HTTPS-CONFIG.md` | HTTPS 配置 |
 
 ---
 
@@ -343,4 +342,4 @@ node index-start-voicechat.js
 # 浏览器访问：http://localhost:3000
 ```
 
-**参考文档：** `INTEGRATION-FLOW.md`
+**参考文档：** `CORRECT-FLOW.md`

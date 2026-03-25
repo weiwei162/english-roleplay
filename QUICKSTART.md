@@ -92,4 +92,4 @@ curl http://localhost:3000/health
 tail -f logs/*.log
 ```
 
-**详细排查：** [`DEPLOY-TEST.md`](DEPLOY-TEST.md)
+**详细排查：** [`START.md`](START.md)

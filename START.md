@@ -240,13 +240,10 @@ curl http://localhost:3000/health
 
 | 文档 | 用途 |
 |------|------|
-| [`README-FINAL.md`](README-FINAL.md) | 项目总结 |
 | [`CORRECT-FLOW.md`](CORRECT-FLOW.md) | ⭐ 正确流程 |
-| [`API-CONFIG.md`](API-CONFIG.md) | 配置 API 说明 |
-| [`INTEGRATION-FLOW.md`](INTEGRATION-FLOW.md) | 集成流程 |
 | [`QUICK-REFERENCE.md`](QUICK-REFERENCE.md) | 快速参考 |
-| [`DEPLOY-TEST.md`](DEPLOY-TEST.md) | 部署测试 |
-| [`STARTVOICECHAT-SETUP.md`](STARTVOICECHAT-SETUP.md) | 配置指南 |
+| [`DEPLOY-DOCKER.md`](DEPLOY-DOCKER.md) | Docker 部署 |
+| [`HTTPS-CONFIG.md`](HTTPS-CONFIG.md) | HTTPS 配置 |
 
 ---
 
@@ -292,8 +289,8 @@ english-roleplay/
 │   └── .env.example        # 配置模板
 └── docs/                   # 文档
     ├── START.md            # 本文档
-    ├── README-FINAL.md     # 项目总结
-    └── CORRECT-FLOW.md     # 正确流程
+    ├── CORRECT-FLOW.md     # 正确流程
+    └── DEPLOY-DOCKER.md    # Docker 部署
 ```
 
 ---
