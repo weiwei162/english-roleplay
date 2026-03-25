@@ -221,14 +221,14 @@ app.post('/api/leave-room', async (req, res) => {
 ### 之前（错误）
 
 ```javascript
-// 前端调用后端创建房间
-const data = await fetch('/api/create-room', {...});
+// 前端调用后端让 AI 加入房间
+const data = await fetch('/api/join-ai', {...});
 
-// 后端创建房间并启动 AI
-// AI 已经在房间里了
+// 后端调用 StartVoiceChat API，AI 加入已存在的房间
+// 前端已在房间里
 
-// 前端再加入房间
-await engine.joinRoom(data.token, ...);
+// AI 加入后开始对话
+await startConversation();
 ```
 
 ### 现在（正确）

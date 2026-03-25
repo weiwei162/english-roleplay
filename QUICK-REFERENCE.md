@@ -12,7 +12,7 @@
 
 ```javascript
 // 前端调用
-const response = await fetch('/api/create-room', {
+const response = await fetch('/api/join-ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -22,7 +22,7 @@ const response = await fetch('/api/create-room', {
 });
 
 const data = await response.json();
-// data: { roomId, token, taskId, aiMode }
+// data: { roomId, taskId, aiMode }
 ```
 
 ---
@@ -89,7 +89,7 @@ createAIVoiceChatRoom()
     ↓
 createStartVoiceChatRoom(roomId, 'emma')
     ↓
-fetch('/api/create-room')  ← HTTP POST
+fetch('/api/join-ai')  ← HTTP POST
     ↓
 后端调用 StartVoiceChat API
     ↓
@@ -106,7 +106,7 @@ fetch('/api/create-room')  ← HTTP POST
 
 ## 📡 API 接口
 
-### POST /api/create-room
+### POST /api/join-ai
 
 **请求：**
 ```json
@@ -226,8 +226,8 @@ curl http://localhost:3000/health
 # 获取角色列表
 curl http://localhost:3000/api/characters
 
-# 创建房间
-curl -X POST http://localhost:3000/api/create-room \
+# AI 加入房间
+curl -X POST http://localhost:3000/api/join-ai \
   -H "Content-Type: application/json" \
   -d '{"roomId":"test1","character":"emma"}'
 
@@ -256,7 +256,7 @@ curl -X POST http://localhost:3000/api/leave-room \
 ### 网络请求
 
 **Network 标签查看：**
-- `POST /api/create-room` - 创建房间
+- `POST /api/join-ai` - AI 加入房间
 - `POST /api/leave-room` - 离开房间
 
 ### RTC 状态

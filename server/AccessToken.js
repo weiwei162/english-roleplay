@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-var randomInt = Math.floor(Math.random() * 0xFFFFFFFF);
+const randomInt = Math.floor(Math.random() * 0xFFFFFFFF);
 
 const VERSION = "001";
 const VERSION_LENGTH = 3;

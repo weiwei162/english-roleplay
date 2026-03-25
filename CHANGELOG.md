@@ -1,5 +1,37 @@
 # English Roleplay - 更新日志
 
+## v3.2.3 (2026-03-25) - 全面清理和更新 ⭐
+
+### 🧹 第二轮文档清理
+
+**删除冗余文档（6 个）**：
+- `INTEGRATION-GUIDE.md` → 内容过时（描述旧架构）
+- `server/DEPENDENCIES.md` → 信息已在 README 中
+- `FRONTEND-ROLE-CHECK.md` → 一次性检查报告
+- `EFFECT-ANALYSIS.md` → 测试分析报告
+- `EFFECT-DEBUG-ANALYSIS.md` → 测试分析报告
+- `TTS-VOICE-CHECK.md` → 一次性检查报告
+
+### 🔧 API 引用更新
+
+**修复过时的 API 端点引用**：
+- `QUICK-REFERENCE.md`: `/api/create-room` → `/api/join-ai`
+- `CORRECT-FLOW.md`: `/api/create-room` → `/api/join-ai`
+
+### 📝 代码质量改进
+
+- ✅ `AccessToken.js`: 使用 `const` 替代 `var`（ES6 语法统一）
+- ✅ 添加 `server/nodemon.json` 配置文件
+- ✅ `ARCHITECTURE-FLOW.md`: 更新版本信息
+
+### 📊 统计
+
+- 文档从 19 个减少到 **13 个**
+- 代码风格统一（ES6）
+- 添加 nodemon 配置
+
+---
+
 ## v3.2.2 (2026-03-25) - 文档精简 ⭐
 
 ### 🧹 文档清理

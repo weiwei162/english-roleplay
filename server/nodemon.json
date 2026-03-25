@@ -1,0 +1,20 @@
+{
+  "watch": [
+    "*.js",
+    ".env"
+  ],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules",
+    "*.test.js",
+    "logs",
+    "ssl"
+  ],
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000,
+  "events": {
+    "restart": "echo '\\n🔁 服务已重启\\n'"
+  }
+}
