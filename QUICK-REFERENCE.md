@@ -208,7 +208,7 @@ await client.stopVoiceChat({
 
 ```bash
 cd server
-node index-start-voicechat.js
+node index-join-ai.js
 ```
 
 ### 运行测试
@@ -338,7 +338,7 @@ date
 cd server
 cp .env.example .env
 # 编辑 .env 填入凭证
-node index-start-voicechat.js
+node index-join-ai.js
 # 浏览器访问：http://localhost:3000
 ```
 

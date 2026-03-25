@@ -258,8 +258,7 @@ await joinAICharacter('emma');
 
 | 文件 | 变更 |
 |------|------|
-| `server/index-join-ai.js` | 新增：AI 加入房间接口 |
-| `server/index-start-voicechat.js` | 保留：旧流程（向后兼容） |
+| `server/index-join-ai.js` | 主入口：AI 加入房间模式 |
 | `server/volc-start-voicechat.js` | 更新：支持两种模式 |
 
 ---
