@@ -658,13 +658,23 @@ app.get('/api/token', authMiddleware, (req, res) => {
             });
         }
         
-        // 用户隔离：检查房间是否属于当前用户
+        // 用户隔离：检查房间是否已被其他用户占用
         const session = sessions.get(roomId);
         if (session && session.userId !== currentUserId) {
             return res.status(403).json({ 
                 success: false, 
-                error: '无权访问其他用户的房间' 
+                error: '该房间已被其他用户占用' 
             });
+        }
+        
+        // 如果 session 不存在，记录当前用户为该房间的创建者（防止抢占）
+        if (!session) {
+            sessions.set(roomId, {
+                userId: currentUserId,
+                createdAt: Date.now(),
+                temp: true // 标记为临时记录，等待 join-ai 确认
+            });
+            console.log('🔒 Room owner registered:', { roomId, userId: currentUserId });
         }
         
         // 直接使用 generateToken() 生成 Token（使用官方 AccessToken.js）
@@ -712,6 +722,12 @@ app.post('/api/join-ai', authMiddleware, async (req, res) => {
             success: false, 
             error: '该房间已被其他用户占用' 
         });
+    }
+    
+    // 检查是否有临时记录（token 请求时创建），验证用户匹配
+    if (existingSession && existingSession.temp) {
+        console.log('✅ Confirming room ownership:', { roomId, userId });
+        // 临时记录验证通过，将在下面更新为正式 session
     }
     
     // targetUserId: 真人用户 ID（前端传入）
