@@ -437,9 +437,30 @@ function getCustomLLMConfig(options = {}) {
 
 /**
  * TTS 音色预设（分组件模式）
- * 参考：豆包语音合成模型 1.0 官方音色列表
+ * 参考：豆包语音合成模型 2.0 官方音色列表
+ * 
+ * 2.0 音色特点：
+ * - 支持情感变化、指令遵循、ASMR
+ * - 推荐使用 V3 接口以获得更优时延表现
  */
 const TTSPreset = {
+    // ============== 2.0 音色（推荐）==============
+    // 女声 2.0
+    LINJIE_NVHAI_V2: 'zh_female_linjianvhai_uranus_bigtts',      // 邻家女孩 2.0
+    QINGXIN_NVSHENG_V2: 'zh_female_qingxinnvsheng_uranus_bigtts', // 清新女声 2.0
+    TIANMEI_TAOZI_V2: 'zh_female_tianmeitaozi_uranus_bigtts',    // 甜美桃子 2.0
+    TIANMEI_XIAOYUAN_V2: 'zh_female_tianmeixiaoyuan_uranus_bigtts', // 甜美小源 2.0
+    SHUANGKUAI_SISI_V2: 'zh_female_shuangkuaisisi_uranus_bigtts', // 爽快思思 2.0
+    VIVI_V2: 'zh_female_vv_uranus_bigtts',                       // Vivi 2.0
+    XIAOHE_V2: 'zh_female_xiaohe_uranus_bigtts',                 // 小何 2.0
+    
+    // 男声 2.0
+    SHAONIAN_ZIXIN_V2: 'zh_male_shaonianzixin_uranus_bigtts',    // 少年梓辛 2.0
+    YUNZHOU_V2: 'zh_male_m191_uranus_bigtts',                    // 云舟 2.0
+    XIAOTIAN_V2: 'zh_male_taocheng_uranus_bigtts',               // 小天 2.0
+    YANGGUANG_QINGNIAN_V2: 'zh_male_yangguangqingnian_uranus_bigtts', // 阳光青年 2.0（未在列表，使用近似）
+    
+    // ============== 1.0 音色（保留兼容）==============
     // 通用场景 - 女声
     LINJIE_NVHAI: 'zh_female_linjianvhai_moon_bigtts',      // 邻家女孩（默认）
     MEILI_NVYOU: 'zh_female_meilinvyou_moon_bigtts',        // 魅力女友
@@ -553,41 +574,41 @@ Speak in warm, gentle English. Be nurturing, attentive, and encouraging. Use sim
  * - S2S: https://www.volcengine.com/docs/6348/1558163
  * 
  * 注意：ResourceId 和 voice_type 需要匹配！
- * 不同 ResourceId 对应不同的音色集合。
+ * 2.0 音色使用 resourceId: seed-tts-2.0
  */
 const TTS_VOICE_CONFIGS = {
     // 分组件模式音色映射 (ttsVoiceType + ttsResourceId)
-    // ResourceId: volc.service_type.10029 (语音合成大模型)
+    // ResourceId: seed-tts-2.0 (语音合成模型 2.0)
     component: {
         emma: {
-            voiceType: TTSPreset.LINJIE_NVHAI,  // 邻家女孩 - 温柔女声
-            resourceId: 'volc.service_type.10029'
+            voiceType: TTSPreset.LINJIE_NVHAI_V2,  // 邻家女孩 2.0 - 温柔女声
+            resourceId: 'seed-tts-2.0'
         },
         tommy: {
-            voiceType: TTSPreset.LINJIE_NANHAI,   // 邻家男孩 - 少年音
-            resourceId: 'volc.service_type.10029'
+            voiceType: TTSPreset.SHAONIAN_ZIXIN_V2,   // 少年梓辛 2.0 - 少年音
+            resourceId: 'seed-tts-2.0'
         },
         lily: {
-            voiceType: TTSPreset.LINJIE_NVHAI,  // 邻家女孩 - 清新女声
-            resourceId: 'volc.service_type.10029'
+            voiceType: TTSPreset.QINGXIN_NVSHENG_V2,  // 清新女声 2.0 - 清新女声
+            resourceId: 'seed-tts-2.0'
         },
         mike: {
-            voiceType: TTSPreset.YANGGUANG_QINGNIAN, // 阳光青年 - 活力男声
-            resourceId: 'volc.service_type.10029'
+            voiceType: TTSPreset.YUNZHOU_V2, // 云舟 2.0 - 沉稳男声
+            resourceId: 'seed-tts-2.0'
         },
         rose: {
-            voiceType: TTSPreset.LINJIE_NVHAI,   // 邻家女孩 - 温柔女声
-            resourceId: 'volc.service_type.10029'
+            voiceType: TTSPreset.VIVI_V2,   // Vivi 2.0 - 温柔女声
+            resourceId: 'seed-tts-2.0'
         },
         
         // 家庭角色
         dad: {
-            voiceType: 'S_y6tmplBW1',   // 自定义音色 - 爸爸专属
+            voiceType: 'S_y6tmplBW1',   // 自定义音色 - 爸爸专属（保持不变）
             resourceId: 'seed-icl-2.0'  // 2.0 版本资源
         },
         mom: {
-            voiceType: TTSPreset.ZHIXING_NVSHENG,  // 知性女声 - 温柔知性
-            resourceId: 'volc.service_type.10029'
+            voiceType: TTSPreset.TIANMEI_XIAOYUAN_V2,  // 甜美小源 2.0 - 温柔女声
+            resourceId: 'seed-tts-2.0'
         }
     },
     // 端到端模式音色映射 (s2sSpeaker)
