@@ -200,7 +200,7 @@
 |------|------|------|
 | `server/.env.example` | ✅ | 环境变量模板 |
 | `server/package.json` | ✅ | 依赖配置 |
-| `frontend/package.json` | ✅ | 前端依赖 |
+| `frontend/` | ✅ | 静态文件（无构建工具） |
 | `docker-compose.yml` | ✅ | Docker 配置 |
 | `Dockerfile` | ✅ | 容器镜像 |
 
