@@ -317,7 +317,8 @@ function getComponentConfig(options = {}) {
                 },
                 Additions: {
                     disable_markdown_filter: true,
-                    enable_language_detector: false
+                    enable_language_detector: false,
+                    enable_latex_tn: false // 关闭 LaTeX 公式播报
                 }
             }
         },
@@ -325,7 +326,7 @@ function getComponentConfig(options = {}) {
         // 字幕配置 - 开启客户端字幕回调
         SubtitleConfig: {
             DisableRTSSubtitle: false, // 开启字幕
-            SubtitleMode: 1 // 1=LLM 原始回复（更快），0=TTS 对齐（更精准但慢）
+            SubtitleMode: 0 // 0=TTS 对齐（更精准但慢），1=LLM 原始回复（更快）
         }
     };
 }
@@ -420,7 +421,8 @@ function getCustomLLMConfig(options = {}) {
                 },
                 Additions: {
                     disable_markdown_filter: true,
-                    enable_language_detector: false
+                    enable_language_detector: false,
+                    enable_latex_tn: false // 关闭 LaTeX 公式播报
                 }
             }
         },
@@ -428,7 +430,7 @@ function getCustomLLMConfig(options = {}) {
         // 字幕配置 - 开启客户端字幕回调
         SubtitleConfig: {
             DisableRTSSubtitle: false,
-            SubtitleMode: 1
+            SubtitleMode: 0 // 0=TTS 对齐（更精准但慢），1=LLM 原始回复（更快）
         }
     };
 }
