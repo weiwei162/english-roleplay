@@ -16,18 +16,13 @@
  * 2. 在创建 Agent 时调用 attachLangSmithTracing(agent, sessionId)
  */
 
-import { Client, traceable } from 'langsmith';
-import { LangSmithTraceError } from 'langsmith/error';
-
 let langsmithAvailable = false;
 let ClientClass = null;
-let traceableFn = null;
 
 // 尝试初始化 LangSmith
 try {
     const langsmith = await import('langsmith');
     ClientClass = langsmith.Client;
-    traceableFn = langsmith.traceable;
     
     const apiKey = process.env.LANGSMITH_API_KEY;
     const tracingEnabled = process.env.LANGSMITH_TRACING === 'true';
