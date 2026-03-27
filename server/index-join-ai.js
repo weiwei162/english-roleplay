@@ -21,6 +21,7 @@ import { VolcStartVoiceChatClient, getComponentConfig, getS2SConfig, getCustomLL
 import { combineCharacterAndScenePrompt } from './prompts.js';
 import { generateToken } from './token-generator.js';
 import { register, login, verifyToken, authMiddleware } from './auth.js';
+import { isLangSmithAvailable, wrapOpenAIClient, logLLMCall, createTraceableFunction } from './langsmith-trace.js';
 import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -474,12 +475,28 @@ app.post('/v1/chat/completions', async (req, res) => {
     const agent = getOrCreateAgent(sessionId, systemPrompt);
     
     const startTime = Date.now();
+    const langsmithEnabled = isLangSmithAvailable();
     
     try {
         const userMessage = messages.filter(m => m.role === 'user').pop();
         if (!userMessage) {
             console.log(`❌ [${requestId}] No user message`);
             return res.status(400).json({ error: 'No user message' });
+        }
+        
+        // LangSmith 追踪：记录 LLM 调用开始
+        let langsmithRun = null;
+        if (langsmithEnabled) {
+            const { createTraceRun } = await import('./langsmith-trace.js');
+            langsmithRun = await createTraceRun('chat_completion', 'llm', {
+                inputs: { messages, sessionId, systemPrompt },
+                metadata: {
+                    request_id: requestId,
+                    model: LLM_MODEL,
+                    provider: LLM_PROVIDER,
+                    stream
+                }
+            });
         }
         
         if (stream) {
@@ -526,6 +543,15 @@ app.post('/v1/chat/completions', async (req, res) => {
             res.write('data: [DONE]\n\n');
             res.end();
             
+            // LangSmith 追踪：记录 LLM 调用结束
+            if (langsmithRun) {
+                await langsmithRun.end({
+                    content: assistantMessage,
+                    finish_reason: 'stop'
+                });
+                console.log(`📊 [${requestId}] Logged to LangSmith: ${langsmithRun.runId}`);
+            }
+            
         } else {
             let assistantMessage = '';
             
@@ -555,11 +581,26 @@ app.post('/v1/chat/completions', async (req, res) => {
                     message: { role: 'assistant', content: assistantMessage }
                 }]
             });
+            
+            // LangSmith 追踪：记录 LLM 调用结束
+            if (langsmithRun) {
+                await langsmithRun.end({
+                    content: assistantMessage,
+                    finish_reason: 'stop'
+                });
+                console.log(`📊 [${requestId}] Logged to LangSmith: ${langsmithRun.runId}`);
+            }
         }
     } catch (error) {
         const duration = Date.now() - startTime;
         console.error(`❌ [${requestId}] Chat API error after ${duration}ms:`, error.message);
         console.error(`   Stack:`, error.stack);
+        
+        // LangSmith 追踪：记录错误
+        if (langsmithRun) {
+            await langsmithRun.end(null, error);
+            console.log(`📊 [${requestId}] Logged error to LangSmith: ${langsmithRun.runId}`);
+        }
         
         if (stream) {
             res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);

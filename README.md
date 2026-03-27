@@ -79,6 +79,12 @@ npm start
 - 动态显示教学内容（动物、食物、日常用品）
 - 中英文双语支持
 
+### 📊 LangSmith 追踪集成
+- 监控 LLM 调用性能
+- 调试对话质量
+- 分析响应延迟
+- 详见：[`LANGSMITH-TRACE.md`](LANGSMITH-TRACE.md)
+
 ## 🎪 场景与角色
 
 ### 4 个场景
@@ -196,6 +202,8 @@ english-roleplay/
 - [`ARCHITECTURE-FLOW.md`](ARCHITECTURE-FLOW.md) - 架构说明
 - [`EFFECT-ANALYSIS.md`](EFFECT-ANALYSIS.md) - 效果分析
 - [`TTS-VOICE-CHECK.md`](TTS-VOICE-CHECK.md) - TTS 语音检查
+- [`LANGSMITH-TRACE.md`](LANGSMITH-TRACE.md) - LangSmith 追踪集成
+- [`LANGSMITH-INTEGRATION-SUMMARY.md`](LANGSMITH-INTEGRATION-SUMMARY.md) - 集成总结
 
 ### 部署运维
 - [`DEPLOY-DOCKER.md`](DEPLOY-DOCKER.md) - Docker 部署
