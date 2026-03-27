@@ -79,11 +79,12 @@ npm start
 - 动态显示教学内容（动物、食物、日常用品）
 - 中英文双语支持
 
-### 📊 LangSmith 追踪集成
-- 监控 LLM 调用性能
-- 调试对话质量
-- 分析响应延迟
-- 详见：[`LANGSMITH-TRACE.md`](LANGSMITH-TRACE.md)
+### 📊 LangSmith 完整事件追踪
+- **pi-agent-core 深度集成** - 追踪完整 Agent 事件序列
+- **多层级追踪** - Agent → Turn → Message → Tool Execution
+- **实时监控** - LLM 调用、工具执行、流式响应
+- **调试利器** - 完整上下文、错误追踪、性能分析
+- 详见：[`LANGSMITH-PI-AGENT-TRACE.md`](LANGSMITH-PI-AGENT-TRACE.md)
 
 ## 🎪 场景与角色
 
