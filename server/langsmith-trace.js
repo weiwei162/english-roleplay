@@ -54,11 +54,17 @@ function getClient() {
 }
 
 /**
- * 生成唯一的 run ID
+ * 生成唯一的 run ID (UUID 格式，符合 LangSmith 要求)
+ * LangSmith 要求 ID 匹配：^[0-9a-f]{32}$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
  * @returns {string}
  */
 function generateRunId() {
-    return `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // 生成 UUID v4 格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    const crypto = require('crypto');
+    const bytes = crypto.randomBytes(16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+    return bytes.toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
 }
 
 /**
