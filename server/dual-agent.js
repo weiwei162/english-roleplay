@@ -359,7 +359,7 @@ export class DualAgentManager {
      * 运行 Tool Agent（有工具，异步处理）
      * 注意：这个不阻塞，后台运行
      */
-    async _runToolAgent(userMessage) {
+    _runToolAgent(userMessage) {
         const startTime = Date.now();
         
         // 创建一个不阻塞的 Promise
@@ -404,6 +404,7 @@ export class DualAgentManager {
             }
         })();
         
+        // 返回 Promise（不 await，让它后台运行）
         return toolPromise;
     }
     

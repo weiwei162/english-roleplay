@@ -542,13 +542,15 @@ app.post('/v1/chat/completions', async (req, res) => {
             res.end();
             
             // Tool Agent 在后台继续运行，不阻塞响应
-            toolTask.then(toolResult => {
-                if (toolResult.hasTools) {
-                    console.log(`🛠️  [${requestId}] Tool Agent completed ${Array.from(dualAgent.toolResults.values()).length} tool calls`);
-                }
-            }).catch(error => {
-                console.error(`❌ [${requestId}] Tool Agent error:`, error.message);
-            });
+            if (toolTask && typeof toolTask.then === 'function') {
+                toolTask.then(toolResult => {
+                    if (toolResult.hasTools) {
+                        console.log(`🛠️  [${requestId}] Tool Agent completed ${Array.from(dualAgent.toolResults.values()).length} tool calls`);
+                    }
+                }).catch(error => {
+                    console.error(`❌ [${requestId}] Tool Agent error:`, error.message);
+                });
+            }
             
         } else {
             // 非流式响应 - 直接返回 Fast Agent 的回复
@@ -570,13 +572,15 @@ app.post('/v1/chat/completions', async (req, res) => {
             });
             
             // Tool Agent 在后台继续运行
-            toolTask.then(toolResult => {
-                if (toolResult.hasTools) {
-                    console.log(`🛠️  [${requestId}] Tool Agent completed ${Array.from(dualAgent.toolResults.values()).length} tool calls`);
-                }
-            }).catch(error => {
-                console.error(`❌ [${requestId}] Tool Agent error:`, error.message);
-            });
+            if (toolTask && typeof toolTask.then === 'function') {
+                toolTask.then(toolResult => {
+                    if (toolResult.hasTools) {
+                        console.log(`🛠️  [${requestId}] Tool Agent completed ${Array.from(dualAgent.toolResults.values()).length} tool calls`);
+                    }
+                }).catch(error => {
+                    console.error(`❌ [${requestId}] Tool Agent error:`, error.message);
+                });
+            }
         }
         
     } catch (error) {
