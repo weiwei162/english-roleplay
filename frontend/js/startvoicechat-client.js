@@ -11,6 +11,29 @@
  * 5. 结束时调用后端接口结束 AI 对话，然后离开并销毁房间
  */
 
+/**
+ * 处理认证失败，跳转到登录界面
+ */
+function handleAuthFailure(reason) {
+    console.warn('🔐 Authentication failed:', reason);
+    
+    // 清除本地认证信息
+    if (window.authClient) {
+        window.authClient.logout();
+    }
+    
+    // 显示登录界面
+    if (typeof showLoginScreen === 'function') {
+        showLoginScreen();
+    }
+    
+    // 提示用户
+    alert('登录已过期或未授权，请重新登录');
+    
+    // 抛出错误，中断当前操作
+    throw new Error('Authentication required');
+}
+
 class StartVoiceChatClient {
     constructor(options = {}) {
         this.appId = options.appId;
@@ -106,6 +129,11 @@ class StartVoiceChatClient {
         try {
             const response = await fetch('/api/config');
             
+            // 处理认证失败（401/403）
+            if (response.status === 401 || response.status === 403) {
+                handleAuthFailure('Config fetch failed with status ' + response.status);
+            }
+            
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -120,6 +148,10 @@ class StartVoiceChatClient {
             }
             
         } catch (error) {
+            // 如果是认证错误，已经在上层处理
+            if (error.message === 'Authentication required') {
+                throw error;
+            }
             console.error('❌ Failed to fetch config:', error);
             throw error;
         }
@@ -141,6 +173,11 @@ class StartVoiceChatClient {
                 }
             });
             
+            // 处理认证失败（401/403）
+            if (response.status === 401 || response.status === 403) {
+                handleAuthFailure('Token fetch failed with status ' + response.status);
+            }
+            
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -155,6 +192,10 @@ class StartVoiceChatClient {
             }
             
         } catch (error) {
+            // 如果是认证错误，已经在上层处理
+            if (error.message === 'Authentication required') {
+                throw error;
+            }
             console.error('❌ Failed to fetch token:', error);
             throw error;
         }
@@ -188,6 +229,11 @@ class StartVoiceChatClient {
                     targetUserId: this.localUserId // 告诉 AI 要对话的用户
                 })
             });
+            
+            // 处理认证失败（401/403）
+            if (response.status === 401 || response.status === 403) {
+                handleAuthFailure('Join AI failed with status ' + response.status);
+            }
             
             if (!response.ok) {
                 const error = await response.json();
@@ -684,7 +730,7 @@ class StartVoiceChatClient {
                 // 获取认证 token
                 const authToken = window.authClient?.token;
                 
-                await fetch('/api/leave-room', {
+                const leaveResponse = await fetch('/api/leave-room', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -695,6 +741,12 @@ class StartVoiceChatClient {
                         taskId: this.taskId
                     })
                 });
+                
+                // 处理认证失败（401/403）
+                if (leaveResponse.status === 401 || leaveResponse.status === 403) {
+                    handleAuthFailure('Leave room failed with status ' + leaveResponse.status);
+                }
+                
                 console.log('✅ AI conversation stopped');
             }
             

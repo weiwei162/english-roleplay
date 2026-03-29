@@ -93,6 +93,17 @@ class AuthClient {
                 body: JSON.stringify({ token: this.token })
             });
             
+            // 处理认证失败（401/403）
+            if (response.status === 401 || response.status === 403) {
+                console.warn('🔐 Token verification failed with status', response.status);
+                this.logout();
+                // 显示登录界面
+                if (typeof showLoginScreen === 'function') {
+                    showLoginScreen();
+                }
+                return false;
+            }
+            
             const data = await response.json();
             
             if (data.success) {
@@ -106,6 +117,7 @@ class AuthClient {
             
         } catch (error) {
             console.error('❌ Verify token error:', error);
+            this.logout();
             return false;
         }
     }

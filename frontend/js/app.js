@@ -1125,6 +1125,45 @@ function checkAuthAndShowScreen() {
     }
 }
 
+/**
+ * 统一的 API 请求包装器，自动处理认证失败
+ * @param {string} url - 请求 URL
+ * @param {Object} options - fetch 选项
+ * @returns {Promise<Response>}
+ */
+async function fetchWithAuth(url, options = {}) {
+    // 添加认证 token
+    const authToken = window.authClient?.token;
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+        ...options.headers
+    };
+    
+    const response = await fetch(url, { ...options, headers });
+    
+    // 处理认证失败（401/403）
+    if (response.status === 401 || response.status === 403) {
+        console.warn('🔐 Authentication failed for', url, '- status:', response.status);
+        
+        // 清除本地认证信息
+        if (window.authClient) {
+            window.authClient.logout();
+        }
+        
+        // 显示登录界面
+        showScreen('login-screen');
+        
+        // 提示用户
+        alert('登录已过期或未授权，请重新登录');
+        
+        // 抛出错误，中断当前操作
+        throw new Error('Authentication required');
+    }
+    
+    return response;
+}
+
 // ==================== 麦克风控制（RTC 模式） ====================
 
 let isMuted = false;
