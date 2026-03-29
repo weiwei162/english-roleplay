@@ -16,6 +16,8 @@
  * 2. 在创建 Agent 时调用 attachLangSmithTracing(agent, sessionId)
  */
 
+import crypto from 'crypto';
+
 let langsmithAvailable = false;
 let ClientClass = null;
 
@@ -59,12 +61,14 @@ function getClient() {
  * @returns {string}
  */
 function generateRunId() {
-    // 生成 UUID v4 格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    const crypto = require('crypto');
-    const bytes = crypto.randomBytes(16);
+    // 使用 Web Crypto API 生成 UUID v4 格式
+    // 格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
     bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
     bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
-    return bytes.toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+    
+    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
 
 /**
