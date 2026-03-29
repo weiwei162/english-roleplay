@@ -22,6 +22,7 @@ import { combineCharacterAndScenePrompt } from './prompts.js';
 import { generateToken } from './token-generator.js';
 import { register, login, verifyToken, authMiddleware } from './auth.js';
 import { isLangSmithAvailable, attachLangSmithTracing, cleanupAllTracers } from './langsmith-trace.js';
+import { getOrCreateDualAgent, cleanupDualAgent } from './dual-agent.js';
 import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -437,19 +438,24 @@ app.get('/pi-agent/health', (req, res) => {
         service: 'pi-agent-core',
         provider: LLM_PROVIDER,
         model: LLM_MODEL,
+        architecture: 'dual-agent',
         timestamp: new Date().toISOString(),
-        activeAgents: piAgents.size
+        activeAgents: piAgents.size,
+        features: {
+            fastAgent: 'Text response (no tools)',
+            toolAgent: 'Async tool execution'
+        }
     });
 });
 
-// ==================== Chat API (pi-agent-core) ====================
+// ==================== Chat API (Dual Agent - 并行处理) ====================
 
 app.post('/v1/chat/completions', async (req, res) => {
     const requestId = `pi-${Date.now()}`;
     const timestamp = Math.floor(Date.now() / 1000);
     
     // 记录请求
-    console.log(`\n📥 [${requestId}] POST /v1/chat/completions`);
+    console.log(`\n📥 [${requestId}] POST /v1/chat/completions (Dual Agent)`);
     console.log(`   SessionId: ${req.query.session_id || 'N/A'}`);
     console.log(`   Messages:`, JSON.stringify(req.body.messages, null, 2));
     
@@ -478,8 +484,6 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
     }
     
-    const agent = getOrCreateAgent(sessionId, systemPrompt);
-    
     const startTime = Date.now();
     
     try {
@@ -489,7 +493,24 @@ app.post('/v1/chat/completions', async (req, res) => {
             return res.status(400).json({ error: 'No user message' });
         }
         
-        // LangSmith 追踪已通过 attachLangSmithTracing 自动附加
+        // 获取或创建 Dual Agent 实例
+        const dualAgent = getOrCreateDualAgent({
+            sessionId,
+            systemPrompt,
+            model: getLLMModel(),
+            sendToolCallToClient,
+            toolCallSessionMap
+        });
+        
+        // 处理消息 - 双 Agent 并行运行
+        const result = await dualAgent.processMessage(userMessage.content);
+        
+        const fastResponse = result.fastResponse;
+        const toolTask = result.toolTask; // 后台运行，不阻塞
+        
+        // 记录 Fast Agent 响应时间
+        const fastDuration = Date.now() - startTime;
+        console.log(`⚡ [${requestId}] Fast response in ${fastDuration}ms`);
         
         if (stream) {
             res.setHeader('Content-Type', 'text/event-stream');
@@ -497,32 +518,17 @@ app.post('/v1/chat/completions', async (req, res) => {
             res.setHeader('Connection', 'keep-alive');
             res.setHeader('X-Request-ID', requestId);
             
-            let assistantMessage = '';
-            const unsubscribe = agent.subscribe((event) => {
-                if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
-                    const delta = event.assistantMessageEvent.delta;
-                    assistantMessage += delta;
-                    res.write(`data: ${JSON.stringify({
-                        id: requestId,
-                        object: 'chat.completion.chunk',
-                        created: timestamp,
-                        model: LLM_MODEL,
-                        choices: [{ index: 0, finish_reason: null, delta: { content: delta } }]
-                    })}\n\n`);
-                }
-                
-            });
-            
-            if (agent.state.isStreaming) {
-                await agent.steer(userMessage.content);
-            } else {
-                await agent.prompt(userMessage.content);
-            }
-            unsubscribe();
-            
-            const duration = Date.now() - startTime;
-            if (assistantMessage.length === 0) {
-                console.warn(`⚠️ [${requestId}] Empty response`);
+            // 流式发送 Fast Agent 的回复
+            const chunks = fastResponse.split(/(\s+)/);
+            for (const chunk of chunks) {
+                res.write(`data: ${JSON.stringify({
+                    id: requestId,
+                    object: 'chat.completion.chunk',
+                    created: timestamp,
+                    model: LLM_MODEL,
+                    choices: [{ index: 0, finish_reason: null, delta: { content: chunk } }]
+                })}\n\n`);
+                await new Promise(resolve => setTimeout(resolve, 10)); // 模拟流式
             }
             
             res.write(`data: ${JSON.stringify({
@@ -535,26 +541,17 @@ app.post('/v1/chat/completions', async (req, res) => {
             res.write('data: [DONE]\n\n');
             res.end();
             
-            // LangSmith 追踪通过 agent 事件自动处理
-            
-        } else {
-            let assistantMessage = '';
-            
-            const unsubscribe = agent.subscribe((event) => {
-                if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
-                    assistantMessage += event.assistantMessageEvent.delta;
+            // Tool Agent 在后台继续运行，不阻塞响应
+            toolTask.then(toolResult => {
+                if (toolResult.hasTools) {
+                    console.log(`🛠️  [${requestId}] Tool Agent completed ${Array.from(dualAgent.toolResults.values()).length} tool calls`);
                 }
+            }).catch(error => {
+                console.error(`❌ [${requestId}] Tool Agent error:`, error.message);
             });
             
-            if (agent.state.isStreaming) {
-                await agent.steer(userMessage.content);
-            } else {
-                await agent.prompt(userMessage.content);
-            }
-            unsubscribe();
-            
-            const duration = Date.now() - startTime;
-            
+        } else {
+            // 非流式响应 - 直接返回 Fast Agent 的回复
             res.json({
                 id: requestId,
                 object: 'chat.completion',
@@ -563,18 +560,29 @@ app.post('/v1/chat/completions', async (req, res) => {
                 choices: [{
                     index: 0,
                     finish_reason: 'stop',
-                    message: { role: 'assistant', content: assistantMessage }
-                }]
+                    message: { role: 'assistant', content: fastResponse }
+                }],
+                // 包含工具执行状态（可选）
+                metadata: {
+                    fastResponseMs: fastDuration,
+                    toolAgentRunning: true
+                }
             });
             
-            // LangSmith 追踪通过 agent 事件自动处理
+            // Tool Agent 在后台继续运行
+            toolTask.then(toolResult => {
+                if (toolResult.hasTools) {
+                    console.log(`🛠️  [${requestId}] Tool Agent completed ${Array.from(dualAgent.toolResults.values()).length} tool calls`);
+                }
+            }).catch(error => {
+                console.error(`❌ [${requestId}] Tool Agent error:`, error.message);
+            });
         }
+        
     } catch (error) {
         const duration = Date.now() - startTime;
         console.error(`❌ [${requestId}] Chat API error after ${duration}ms:`, error.message);
         console.error(`   Stack:`, error.stack);
-        
-        // LangSmith 错误追踪通过 agent 事件自动处理
         
         if (stream) {
             res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
@@ -885,7 +893,13 @@ app.post('/api/leave-room', authMiddleware, async (req, res) => {
             taskId
         });
         
+        // 清理 Dual Agent 会话
+        cleanupDualAgent(roomId);
+        
+        // 清理旧式 Agent 会话（兼容性）
+        piAgents.delete(roomId);
         sessions.delete(roomId);
+        
         console.log(`✅ AI left room: ${roomId} (user: ${currentUserId})`);
         
         res.json({ success: true, message: 'AI left room successfully' });
