@@ -136,11 +136,17 @@ class LangSmithTracer {
 
         const runId = generateRunId();
         
+        // 确保 name 不为空且有效
+        if (!name || typeof name !== 'string' || name.trim() === '') {
+            name = `Unnamed_${runType}_${Date.now()}`;
+        }
+        
         try {
-            await this.client.createRun(runId, {
-                name,
-                type: runType,
-                inputs,
+            await this.client.createRun({
+                id: runId,
+                name: name.trim(),
+                run_type: runType,
+                inputs: inputs || {},
                 metadata: {
                     session_id: this.sessionId,
                     ...metadata
