@@ -503,10 +503,8 @@ app.post('/v1/chat/completions', async (req, res) => {
         });
         
         // 处理消息 - 双 Agent 并行运行
-        const result = await dualAgent.processMessage(userMessage.content);
-        
-        const fastResponse = result.fastResponse;
-        const toolTask = result.toolTask; // 后台运行，不阻塞
+        // Fast Agent 返回文本响应，Tool Agent 在后台执行工具调用（响应被忽略）
+        const fastResponse = await dualAgent.processMessage(userMessage.content);
         
         // 记录 Fast Agent 响应时间
         const fastDuration = Date.now() - startTime;
@@ -541,17 +539,6 @@ app.post('/v1/chat/completions', async (req, res) => {
             res.write('data: [DONE]\n\n');
             res.end();
             
-            // Tool Agent 在后台继续运行，不阻塞响应
-            if (toolTask && typeof toolTask.then === 'function') {
-                toolTask.then(toolResult => {
-                    if (toolResult.hasTools) {
-                        console.log(`🛠️  [${requestId}] Tool Agent completed ${Array.from(dualAgent.toolResults.values()).length} tool calls`);
-                    }
-                }).catch(error => {
-                    console.error(`❌ [${requestId}] Tool Agent error:`, error.message);
-                });
-            }
-            
         } else {
             // 非流式响应 - 直接返回 Fast Agent 的回复
             res.json({
@@ -564,23 +551,11 @@ app.post('/v1/chat/completions', async (req, res) => {
                     finish_reason: 'stop',
                     message: { role: 'assistant', content: fastResponse }
                 }],
-                // 包含工具执行状态（可选）
                 metadata: {
                     fastResponseMs: fastDuration,
-                    toolAgentRunning: true
+                    toolAgentRunning: true  // Tool Agent 在后台执行工具调用
                 }
             });
-            
-            // Tool Agent 在后台继续运行
-            if (toolTask && typeof toolTask.then === 'function') {
-                toolTask.then(toolResult => {
-                    if (toolResult.hasTools) {
-                        console.log(`🛠️  [${requestId}] Tool Agent completed ${Array.from(dualAgent.toolResults.values()).length} tool calls`);
-                    }
-                }).catch(error => {
-                    console.error(`❌ [${requestId}] Tool Agent error:`, error.message);
-                });
-            }
         }
         
     } catch (error) {

@@ -271,9 +271,11 @@ export class DualAgentManager {
     /**
      * 处理用户消息
      * @param {string} userMessage - 用户消息
-     * @returns {Promise<Object>} - { fastResponse: string, toolTask: Promise }
+     * @returns {Promise<string>} - Fast Agent 的文本响应
      * 
-     * 注意：Fast Agent 完成后立即返回，不等待 Tool Agent
+     * 注意：
+     * - Fast Agent 完成后立即返回
+     * - Tool Agent 在后台运行，只负责工具调用，响应被忽略
      */
     async processMessage(userMessage) {
         if (this.isProcessing) {
@@ -282,20 +284,22 @@ export class DualAgentManager {
         
         this.isProcessing = true;
         
-        // 并行启动两个 Agent，但不等待 Tool Agent
-        // Fast Agent 完成后立即返回
+        // 并行启动两个 Agent
+        // Fast Agent：返回文本响应给用户
+        // Tool Agent：后台运行，只执行工具调用，响应被忽略
         const fastResponsePromise = this._runFastAgent(userMessage);
-        const toolTask = this._runToolAgent(userMessage); // 不 await，后台运行
         
-        // 只等待 Fast Agent
+        // Tool Agent 在后台运行，不等待、不阻塞
+        this._runToolAgent(userMessage).catch(error => {
+            console.error(`❌ [ToolAgent] Background error:`, error.message);
+        });
+        
+        // 只等待 Fast Agent 的响应
         const fastResponse = await fastResponsePromise;
         
         this.isProcessing = false;
         
-        return {
-            fastResponse,
-            toolTask
-        };
+        return fastResponse;
     }
     
     /**
