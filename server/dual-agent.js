@@ -272,6 +272,8 @@ export class DualAgentManager {
      * 处理用户消息
      * @param {string} userMessage - 用户消息
      * @returns {Promise<Object>} - { fastResponse: string, toolTask: Promise }
+     * 
+     * 注意：Fast Agent 完成后立即返回，不等待 Tool Agent
      */
     async processMessage(userMessage) {
         if (this.isProcessing) {
@@ -280,12 +282,13 @@ export class DualAgentManager {
         
         this.isProcessing = true;
         
-        // 并行运行两个 Agent
-        // 注意：两个 Agent 各自维护自己的消息历史，不需要手动同步
-        const [fastResponse, toolTask] = await Promise.all([
-            this._runFastAgent(userMessage),
-            this._runToolAgent(userMessage)
-        ]);
+        // 并行启动两个 Agent，但不等待 Tool Agent
+        // Fast Agent 完成后立即返回
+        const fastResponsePromise = this._runFastAgent(userMessage);
+        const toolTask = this._runToolAgent(userMessage); // 不 await，后台运行
+        
+        // 只等待 Fast Agent
+        const fastResponse = await fastResponsePromise;
         
         this.isProcessing = false;
         
