@@ -11,10 +11,11 @@
  * 3. Fast Agent 立即返回文本
  * 4. Tool Agent 后台分析并执行工具
  * 5. 工具结果缓存，注入到下一轮对话
+ * 
+ * 注意：pi-agent-core 自己维护消息历史，不需要手动同步
  */
 
 import { Agent } from '@mariozechner/pi-agent-core';
-import { getModel } from '@mariozechner/pi-ai';
 import { isLangSmithAvailable, attachLangSmithTracing } from './langsmith-trace.js';
 
 // 工具定义（与主服务共享）
@@ -197,6 +198,9 @@ export function createTools(sendToolCallToClient, toolCallSessionMap) {
 
 /**
  * 双 Agent 管理器
+ * 
+ * 注意：pi-agent-core 自己维护消息历史 (this._state.messages)
+ * 不需要手动同步历史，直接调用 prompt() 即可
  */
 export class DualAgentManager {
     constructor(options) {
@@ -207,14 +211,11 @@ export class DualAgentManager {
         this.sendToolCallToClient = options.sendToolCallToClient;
         this.toolCallSessionMap = options.toolCallSessionMap;
         
-        // 两个独立的 Agent
+        // 两个独立的 Agent（各自维护自己的消息历史）
         this.fastAgent = null;
         this.toolAgent = null;
         
-        // 消息历史（共享）
-        this.messageHistory = [];
-        
-        // 工具执行结果缓存
+        // 工具执行结果缓存（用于跨 Agent 共享工具调用结果）
         this.toolResults = new Map();
         
         // 状态
@@ -238,7 +239,7 @@ export class DualAgentManager {
                 model: this.model,
                 thinkingLevel: 'off',
                 tools: [], // 无工具
-                messages: []
+                messages: [] // Agent 会自动维护这个数组
             }
         });
         
@@ -279,17 +280,8 @@ export class DualAgentManager {
         
         this.isProcessing = true;
         
-        // 添加到消息历史
-        this.messageHistory.push({
-            role: 'user',
-            content: userMessage,
-            timestamp: Date.now()
-        });
-        
-        // 同步消息历史到两个 Agent
-        this._syncMessageHistory();
-        
         // 并行运行两个 Agent
+        // 注意：两个 Agent 各自维护自己的消息历史，不需要手动同步
         const [fastResponse, toolTask] = await Promise.all([
             this._runFastAgent(userMessage),
             this._runToolAgent(userMessage)
@@ -304,48 +296,43 @@ export class DualAgentManager {
     }
     
     /**
-     * 同步消息历史到两个 Agent
-     */
-    _syncMessageHistory() {
-        // 只同步最近的 N 条消息，避免上下文过长
-        const recentMessages = this.messageHistory.slice(-10);
-        
-        this.fastAgent.state.messages = [...recentMessages];
-        this.toolAgent.state.messages = [...recentMessages];
-    }
-    
-    /**
      * 运行 Fast Agent（无工具，快速回复）
+     * 
+     * pi-agent-core 会自动：
+     * 1. 将新消息追加到 this._state.messages
+     * 2. 发送完整历史给 LLM
+     * 3. 将响应追加到历史
      */
     async _runFastAgent(userMessage) {
         const startTime = Date.now();
         
         try {
             let response = '';
+            
+            // 订阅事件流
             const unsubscribe = this.fastAgent.subscribe((event) => {
+                // 文本片段到达 - 立即捕获用于返回
                 if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
                     response += event.assistantMessageEvent.delta;
                 }
             });
             
+            // 直接调用 prompt()，Agent 会自动处理历史
             if (this.fastAgent.state.isStreaming) {
+                // 如果正在处理，使用 steer() 中断
                 await this.fastAgent.steer(userMessage);
             } else {
+                // 正常流程
                 await this.fastAgent.prompt(userMessage);
             }
             
             unsubscribe();
             
-            // 将 Fast Agent 的回复添加到历史
-            this.messageHistory.push({
-                role: 'assistant',
-                content: response,
-                timestamp: Date.now(),
-                source: 'fast'
-            });
-            
             const duration = Date.now() - startTime;
             console.log(`⚡ [FastAgent] Response in ${duration}ms: "${response.substring(0, 50)}..."`);
+            
+            // 注意：不需要手动添加到历史！
+            // Agent 在 message_end 事件中自动追加到 this.fastAgent.state.messages
             
             return response;
             
@@ -370,11 +357,12 @@ export class DualAgentManager {
                 
                 let response = '';
                 const unsubscribe = this.toolAgent.subscribe((event) => {
+                    // 文本片段到达
                     if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
                         response += event.assistantMessageEvent.delta;
                     }
                     
-                    // 记录工具执行结果
+                    // 工具执行完成 - 缓存结果
                     if (event.type === 'tool_execution_end') {
                         this.toolResults.set(event.toolCallId, {
                             toolName: event.toolName,
@@ -420,6 +408,14 @@ export class DualAgentManager {
     }
     
     /**
+     * 获取某个 Agent 的消息历史（用于调试）
+     */
+    getMessageHistory(source = 'fast') {
+        const agent = source === 'fast' ? this.fastAgent : this.toolAgent;
+        return agent.state.messages;
+    }
+    
+    /**
      * 清理资源
      */
     cleanup() {
@@ -430,9 +426,12 @@ export class DualAgentManager {
             this.toolTracer();
         }
         
+        // 清理 Agent（会自动清空内部状态）
+        this.fastAgent?.reset();
+        this.toolAgent?.reset();
         this.fastAgent = null;
         this.toolAgent = null;
-        this.messageHistory = [];
+        
         this.toolResults.clear();
         
         console.log(`🧹 [DualAgent] Cleaned up session: ${this.sessionId}`);
