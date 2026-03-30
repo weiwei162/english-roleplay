@@ -315,12 +315,17 @@ export class DualAgentManager {
         
         try {
             let response = '';
+            let isComplete = false;
             
             // 订阅事件流
             const unsubscribe = this.fastAgent.subscribe((event) => {
                 // 文本片段到达 - 立即捕获用于返回
                 if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
                     response += event.assistantMessageEvent.delta;
+                }
+                // 消息完成
+                if (event.type === 'message_end') {
+                    isComplete = true;
                 }
             });
             
