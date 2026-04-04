@@ -16,6 +16,7 @@
  * 2. 在创建 Agent 时调用 attachLangSmithTracing(agent, sessionId)
  */
 
+import './logger.js'; // 统一日志时间戳
 import crypto from 'crypto';
 
 let langsmithAvailable = false;

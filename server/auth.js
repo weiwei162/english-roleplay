@@ -3,6 +3,7 @@
  * 简单的基于 JWT 的认证系统
  */
 
+import './logger.js'; // 统一日志时间戳
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import path from 'path';

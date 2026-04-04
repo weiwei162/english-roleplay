@@ -15,6 +15,7 @@
  * 注意：pi-agent-core 自己维护消息历史，不需要手动同步
  */
 
+import './logger.js'; // 统一日志时间戳
 import { Agent } from '@mariozechner/pi-agent-core';
 import { isLangSmithAvailable, attachLangSmithTracing } from './langsmith-trace.js';
 
@@ -221,6 +222,12 @@ export class DualAgentManager {
         // 状态
         this.isProcessing = false;
         
+        // 当前流式响应追踪（用于打断时结束前一个响应）
+        this.currentStream = null;
+        
+        // 部分响应内容追踪（用于打断时保存到历史）
+        this.lastPartialResponse = '';
+        
         // LangSmith 追踪
         this.fastTracer = null;
         this.toolTracer = null;
@@ -232,15 +239,24 @@ export class DualAgentManager {
      * 初始化两个 Agent
      */
     _initAgents() {
+        console.log(`🎭 [DualAgent] Creating agents for session: ${this.sessionId}`);
+        console.log(`🤖 Model config:`, { api: this.model.api, provider: this.model.provider, baseUrl: this.model.baseUrl, hasKey: !!this.model.apiKey });
+        
         // Fast Agent - 无工具，快速回复
         this.fastAgent = new Agent({
             initialState: {
                 systemPrompt: this.systemPrompt,
                 model: this.model,
-                thinkingLevel: 'off',
-                tools: [], // 无工具
+                thinkingLevel: 'off',  // 关闭 thinking，让 enable_thinking: false
+                tools: undefined, // 不传递 tools，避免 dashscope 报错
                 messages: [] // Agent 会自动维护这个数组
             }
+        });
+        
+        console.log(`✅ [DualAgent] Fast Agent created, model:`, {
+            api: this.model.api,
+            provider: this.model.provider,
+            hasKey: !!this.model.apiKey
         });
         
         // Tool Agent - 有工具，异步处理
@@ -259,27 +275,75 @@ export class DualAgentManager {
             }
         });
         
+        console.log(`✅ [DualAgent] Tool Agent created`);
+        
+        // 注意：不调用 reset()，因为 reset() 会触发空转事件周期
+        // Agent 创建时已经是干净状态（messages: []）
+        console.log(`✅ [DualAgent] Agents ready (messages: ${this.fastAgent.state.messages?.length || 0})`);
+        
         // 附加 LangSmith 追踪
         if (isLangSmithAvailable()) {
             this.fastTracer = attachLangSmithTracing(this.fastAgent, `${this.sessionId}_fast`, 'english-roleplay-fast');
             this.toolTracer = attachLangSmithTracing(this.toolAgent, `${this.sessionId}_tool`, 'english-roleplay-tool');
         }
         
-        console.log(`🎭 [DualAgent] Initialized for session: ${this.sessionId}`);
+        console.log(`🎭 Initialized for session: ${this.sessionId}`);
     }
     
     /**
      * 处理用户消息
      * @param {string} userMessage - 用户消息
-     * @returns {Promise<string>} - Fast Agent 的文本响应
+     * @param {Object} options - 可选参数
+     * @param {boolean} options.stream - 是否流式响应（默认 false）
+     * @param {Function} options.onChunk - 流式回调，接收到 text_delta 时调用 (chunk: string) => void
+     * @param {Object} options.res - HTTP 响应对象（用于 steer 时结束前一个响应）
+     * @returns {Promise<string>} - Fast Agent 的文本响应（stream=false 时返回完整响应，stream=true 时也返回完整响应供参考）
      * 
      * 注意：
      * - Fast Agent 完成后立即返回
-     * - Tool Agent 在后台运行，只负责工具调用，响应被忽略
+     * - Tool Agent 在后台运行，只执行工具调用，响应被忽略
      */
-    async processMessage(userMessage) {
-        if (this.isProcessing) {
-            console.warn(`⚠️ [DualAgent] Already processing, queueing message`);
+    async processMessage(userMessage, options = {}) {
+        const { stream = false, onChunk = null, res = null } = options;
+        
+        // 如果是流式响应，追踪当前响应对象
+        if (stream && res) {
+            // 如果前一个流式响应还在进行中，打断它
+            if (this.currentStream && !this.currentStream.isEnded) {
+                console.warn(`⚠️ Interrupting previous streaming response, saving partial content...`);
+                
+                // 1. 结束前一个 HTTP 响应
+                this.currentStream.res.end();
+                this.currentStream.isEnded = true;
+                
+                // 2. 立即保存已输出内容到 Fast Agent 消息历史（关键！）
+                const partialContent = this.lastPartialResponse;
+                if (partialContent && partialContent.length > 0) {
+                    // 同步保存，确保请求 B 能看到完整的请求 A 响应
+                    this.fastAgent.state.messages.push({
+                        role: 'assistant',
+                        content: partialContent
+                    });
+                    console.log(`✅ Saved partial response to history: "${partialContent.substring(0, 50)}..."`);
+                }
+                
+                // 3. 重置状态
+                this.lastPartialResponse = '';
+                
+                // 4. 立即重置 Agent 的 isStreaming 状态（关键！）
+                // 保留请求 A 的消息历史，让请求 B 可以利用上下文
+                this.fastAgent.state.isStreaming = false;
+                console.log(`✅ FastAgent isStreaming reset, messages preserved for context`);
+                
+                // 5. 同时停止 Tool Agent 的后台处理
+                this.toolAgent.state.isStreaming = false;
+                console.log(`✅ ToolAgent isStreaming reset`);
+                
+                // 6. 短暂等待，确保状态重置生效
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            // 设置当前流式响应
+            this.currentStream = { res, isEnded: false };
         }
         
         this.isProcessing = true;
@@ -287,17 +351,22 @@ export class DualAgentManager {
         // 并行启动两个 Agent
         // Fast Agent：返回文本响应给用户
         // Tool Agent：后台运行，只执行工具调用，响应被忽略
-        const fastResponsePromise = this._runFastAgent(userMessage);
+        const fastResponsePromise = this._runFastAgent(userMessage, { stream, onChunk });
         
         // Tool Agent 在后台运行，不等待、不阻塞
         this._runToolAgent(userMessage).catch(error => {
-            console.error(`❌ [ToolAgent] Background error:`, error.message);
+            console.error(`❌ Background error:`, error.message);
         });
         
         // 只等待 Fast Agent 的响应
         const fastResponse = await fastResponsePromise;
         
         this.isProcessing = false;
+        
+        // 流式响应完成后，清理追踪
+        if (stream && this.currentStream && !this.currentStream.isEnded) {
+            this.currentStream.isEnded = true;
+        }
         
         return fastResponse;
     }
@@ -309,47 +378,120 @@ export class DualAgentManager {
      * 1. 将新消息追加到 this._state.messages
      * 2. 发送完整历史给 LLM
      * 3. 将响应追加到历史
+     * 
+     * @param {string} userMessage - 用户消息
+     * @param {Object} options - 可选参数
+     * @param {boolean} options.stream - 是否流式响应
+     * @param {Function} options.onChunk - 流式回调 (chunk: string) => void
      */
-    async _runFastAgent(userMessage) {
+    async _runFastAgent(userMessage, options = {}) {
         const startTime = Date.now();
+        const { stream = false, onChunk = null } = options;
         
         try {
             let response = '';
             let isComplete = false;
+            let subscribedEventCount = 0;
             
-            // 订阅事件流
+            // 订阅事件流 - 每次调用都重新订阅
+            // 注意：pi-agent-core 在创建 Agent 时会触发初始事件周期，需要忽略
+            let promptCalled = false;
+            
             const unsubscribe = this.fastAgent.subscribe((event) => {
-                // 文本片段到达 - 立即捕获用于返回
-                if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'text_delta') {
-                    response += event.assistantMessageEvent.delta;
+                subscribedEventCount++;
+                const localEventNum = subscribedEventCount;
+                
+                // 忽略 prompt 调用前的事件（Agent 初始化事件）
+                if (!promptCalled) {
+                    return;
+                }
+                
+                console.log(`🔔 [Event #${localEventNum}] ${event.type}`, 
+                    event.assistantMessageEvent?.type ? `(${event.assistantMessageEvent.type})` : '',
+                    event.assistantMessageEvent?.delta ? `"${event.assistantMessageEvent.delta.substring(0, 20)}..."` : ''
+                );
+                // 调试：记录所有事件
+                if (event.type === 'message_update' && event.assistantMessageEvent) {
+                    console.log(`   [DEBUG] assistantMessageEvent:`, JSON.stringify({
+                        type: event.assistantMessageEvent.type,
+                        delta: event.assistantMessageEvent.delta?.substring(0, 50)
+                    }));
+                }
+                
+                // 文本片段到达 - 立即捕获并回调
+                // 同时处理 text_delta 和 thinking_delta（有些模型先输出思考）
+                if (event.type === 'message_update' && 
+                    (event.assistantMessageEvent?.type === 'text_delta' || 
+                     event.assistantMessageEvent?.type === 'thinking_delta')) {
+                    const delta = event.assistantMessageEvent.delta;
+                    response += delta;
+                    // 追踪部分响应（用于打断时保存）- 只在 text_delta 时保存
+                    if (event.assistantMessageEvent?.type === 'text_delta') {
+                        this.lastPartialResponse = response;
+                    }
+                    // 流式回调：实时推送 chunk（只推送 text_delta）
+                    if (stream && onChunk && event.assistantMessageEvent?.type === 'text_delta') {
+                        onChunk(delta);
+                    }
                 }
                 // 消息完成
                 if (event.type === 'message_end') {
-                    isComplete = true;
+                    console.log(`🏁 [message_end] isComplete=${response.length > 0}, response="${response.substring(0, 30)}..."`);
+                    // 只在有实际内容时设置 isComplete
+                    if (response.length > 0) {
+                        isComplete = true;
+                        // 保存完整响应（用于调试）
+                        this.lastPartialResponse = response;
+                    }
                 }
             });
             
-            // 直接调用 prompt()，Agent 会自动处理历史
-            if (this.fastAgent.state.isStreaming) {
-                // 如果正在处理，使用 steer() 中断
-                await this.fastAgent.steer(userMessage);
-            } else {
-                // 正常流程
-                await this.fastAgent.prompt(userMessage);
-            }
+            console.log(`📋 [Before prompt] Agent state:`, {
+                isStreaming: this.fastAgent.state.isStreaming,
+                messagesCount: this.fastAgent.state.messages?.length || 0,
+                systemPrompt: this.fastAgent.state.systemPrompt?.substring(0, 50) + '...'
+            });
             
+            // 标记 prompt 即将开始
+            promptCalled = true;
+            
+            // 直接调用 prompt()，Agent 会自动处理历史
+            await this.fastAgent.prompt(userMessage);
+            
+            // 等待 message_end 事件
+            const waitForComplete = () => new Promise((resolve) => {
+                if (isComplete) {
+                    resolve();
+                    return;
+                }
+                const checkComplete = setInterval(() => {
+                    if (isComplete) {
+                        clearInterval(checkComplete);
+                        resolve();
+                    }
+                }, 10);
+                // 30 秒超时
+                setTimeout(() => {
+                    clearInterval(checkComplete);
+                    console.warn(`⚠️ Timeout waiting for message_end`);
+                    resolve();
+                }, 30000);
+            });
+            
+            await waitForComplete();
             unsubscribe();
             
             const duration = Date.now() - startTime;
-            console.log(`⚡ [FastAgent] Response in ${duration}ms: "${response.substring(0, 50)}..."`);
+            console.log(`⚡ Response in ${duration}ms: "${response.substring(0, 50)}..."`);
             
             // 注意：不需要手动添加到历史！
             // Agent 在 message_end 事件中自动追加到 this.fastAgent.state.messages
+            // 但打断场景下需要手动保存（在 processMessage 中处理）
             
             return response;
             
         } catch (error) {
-            console.error(`❌ [FastAgent] Error:`, error.message);
+            console.error(`❌ Error:`, error.message);
             return "I'm thinking about that...";
         }
     }
@@ -381,7 +523,7 @@ export class DualAgentManager {
                             result: event.result,
                             timestamp: Date.now()
                         });
-                        console.log(`🔧 [ToolAgent] Tool completed: ${event.toolName}`);
+                        console.log(`🔧 Tool completed: ${event.toolName}`);
                     }
                 });
                 
@@ -394,18 +536,33 @@ export class DualAgentManager {
                 unsubscribe();
                 
                 const duration = Date.now() - startTime;
-                console.log(`🛠️  [ToolAgent] Processing completed in ${duration}ms`);
+                console.log(`🛠️  Processing completed in ${duration}ms`);
                 
                 return { response, hasTools: this.toolResults.size > 0 };
                 
             } catch (error) {
-                console.error(`❌ [ToolAgent] Error:`, error.message);
+                console.error(`❌ Error:`, error.message);
                 return { response: '', hasTools: false, error: error.message };
             }
         })();
         
         // 返回 Promise（不 await，让它后台运行）
         return toolPromise;
+    }
+    
+    /**
+     * 等待 Agent 准备好（不再处理 prompt）
+     */
+    async _waitForAgentReady(timeout = 10000) {  // 增加到 10 秒
+        const startTime = Date.now();
+        while (this.fastAgent.state.isStreaming || this.isProcessing) {
+            if (Date.now() - startTime > timeout) {
+                console.warn(`⚠️ Timeout waiting for agent to be ready after ${timeout}ms`);
+                return false;
+            }
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        return true;
     }
     
     /**
@@ -446,7 +603,7 @@ export class DualAgentManager {
         
         this.toolResults.clear();
         
-        console.log(`🧹 [DualAgent] Cleaned up session: ${this.sessionId}`);
+        console.log(`🧹 Cleaned up session: ${this.sessionId}`);
     }
 }
 
@@ -472,7 +629,7 @@ export function getOrCreateDualAgent(options) {
         });
         
         dualAgentSessions.set(sessionId, manager);
-        console.log(`🎭 [DualAgent] Created new instance for: ${sessionId}`);
+        console.log(`🎭 Created new instance for: ${sessionId}`);
     }
     
     return dualAgentSessions.get(sessionId);

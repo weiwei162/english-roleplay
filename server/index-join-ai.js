@@ -23,6 +23,9 @@ import { generateToken } from './token-generator.js';
 import { register, login, verifyToken, authMiddleware } from './auth.js';
 import { isLangSmithAvailable, attachLangSmithTracing, cleanupAllTracers } from './langsmith-trace.js';
 import { getOrCreateDualAgent, cleanupDualAgent } from './dual-agent.js';
+import { registerActiveRequest, clearActiveRequest, getActiveRequestsStats } from './request-cancellation.js';
+import './logger.js'; // 统一日志时间戳
+import { setRequestContext } from './logger.js'; // 请求上下文追踪
 import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -133,21 +136,35 @@ const LLM_BASE_URL = process.env.LLM_BASE_URL;
 const LLM_CUSTOM_PROVIDER = process.env.LLM_CUSTOM_PROVIDER || 'openai'; // 自定义 BASE_URL 时的提供商
 
 // 获取模型（支持内置提供商和自定义 OpenAI compatible 服务）
+const DASHSCOPE_API_KEY = process.env.OPENAI_API_KEY;
+
 function getLLMModel() {
     // 如果有自定义 BASE_URL，使用 openai-completions 兼容模式
     if (LLM_BASE_URL) {
-        return {
+        const modelConfig = {
             id: LLM_MODEL,
             name: LLM_MODEL,
             api: 'openai-completions',
-            provider: LLM_CUSTOM_PROVIDER,
+            provider: 'openai',
             baseUrl: LLM_BASE_URL,
-            reasoning: false,
+            apiKey: DASHSCOPE_API_KEY,
+            getApiKey: async () => DASHSCOPE_API_KEY,
+            reasoning: true,  // 启用 reasoning 参数，让 pi-ai 添加 enable_thinking 字段
             input: ['text', 'image'],
             cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
             contextWindow: 128000,
-            maxTokens: 16384
+            maxTokens: 16384,
+            compat: {
+                thinkingFormat: 'qwen',  // 使用 qwen 格式
+                supportsDeveloperRole: false  // dashscope 不支持 developer 角色
+            }
+            // 注意：thinkingLevel: 'off' 会控制 enable_thinking: false
+            // reasoning: true + thinkingLevel: 'off' 组合：
+            // - reasoning: true 让 pi-ai 添加 enable_thinking 参数（绕过 tools 验证）
+            // - thinkingLevel: 'off' 设置 enable_thinking: false（禁用模型思考）
         };
+        console.log('🤖 Model config:', JSON.stringify(modelConfig, null, 2));
+        return modelConfig;
     }
     // 使用内置提供商
     return getModel(LLM_PROVIDER, LLM_MODEL);
@@ -454,123 +471,187 @@ app.post('/v1/chat/completions', async (req, res) => {
     const requestId = `pi-${Date.now()}`;
     const timestamp = Math.floor(Date.now() / 1000);
     
-    // 记录请求
-    console.log(`\n📥 [${requestId}] POST /v1/chat/completions (Dual Agent)`);
-    console.log(`   SessionId: ${req.query.session_id || 'N/A'}`);
-    console.log(`   Messages:`, JSON.stringify(req.body.messages, null, 2));
+    // 设置请求上下文，后续日志自动带上 requestId
+    const runWithContext = setRequestContext({ requestId });
     
-    const {
-        messages = [],
-        stream = false
-    } = req.body;
-    
-    const sessionId = req.query.session_id || `session_${Date.now()}`;
-    
-    // 从 sessionId 解析角色和场景信息
-    // sessionId 格式：room_{character}_{sceneId}_{timestamp}
-    let systemPrompt = '';
-    const sessionParts = sessionId.split('_');
-    if (sessionParts.length >= 3) {
-        const character = sessionParts[1];
-        const sceneId = sessionParts[2];
+    await runWithContext(async () => {
+        // 记录请求
+        console.log(`\n📥 POST /v1/chat/completions (Dual Agent)`);
+        console.log(`   SessionId: ${req.query.session_id || 'N/A'}`);
+        console.log(`   Messages:`, JSON.stringify(req.body.messages, null, 2));
         
-        // 获取角色和场景配置
+        const {
+            messages = [],
+            stream = false
+        } = req.body;
+        
+        const sessionId = req.query.session_id || `session_${Date.now()}`;
+        
+        // 从 sessionId 解析角色和场景信息
+        // sessionId 格式：room_{character}_{sceneId}_{timestamp}
+        let systemPrompt = '';
+        const sessionParts = sessionId.split('_');
+        if (sessionParts.length >= 3) {
+            const character = sessionParts[1];
+            const sceneId = sessionParts[2];
+            
+            // 获取角色和场景配置
+            try {
+                const characterConfig = getCharacterConfig(character, 'component');
+                const combinedConfig = combineCharacterAndScenePrompt(characterConfig, sceneId);
+                systemPrompt = combinedConfig.systemPrompt;
+            } catch (error) {
+                console.warn(`Failed to get dynamic systemPrompt: ${error.message}`);
+            }
+        }
+        
+        const startTime = Date.now();
+        
         try {
-            const characterConfig = getCharacterConfig(character, 'component');
-            const combinedConfig = combineCharacterAndScenePrompt(characterConfig, sceneId);
-            systemPrompt = combinedConfig.systemPrompt;
-        } catch (error) {
-            console.warn(`⚠️ [${requestId}] Failed to get dynamic systemPrompt: ${error.message}`);
-        }
-    }
-    
-    const startTime = Date.now();
-    
-    try {
-        const userMessage = messages.filter(m => m.role === 'user').pop();
-        if (!userMessage) {
-            console.log(`❌ [${requestId}] No user message`);
-            return res.status(400).json({ error: 'No user message' });
-        }
+            const userMessage = messages.filter(m => m.role === 'user').pop();
+            if (!userMessage) {
+                console.log(`❌ No user message`);
+                return res.status(400).json({ error: 'No user message' });
+            }
+            
+            // 获取或创建 Dual Agent 实例
+            const dualAgent = getOrCreateDualAgent({
+                sessionId,
+                systemPrompt,
+                model: getLLMModel(),
+                sendToolCallToClient,
+                toolCallSessionMap
+            });
         
-        // 获取或创建 Dual Agent 实例
-        const dualAgent = getOrCreateDualAgent({
-            sessionId,
-            systemPrompt,
-            model: getLLMModel(),
-            sendToolCallToClient,
-            toolCallSessionMap
-        });
-        
-        // 处理消息 - 双 Agent 并行运行
-        // Fast Agent 返回文本响应，Tool Agent 在后台执行工具调用（响应被忽略）
-        const fastResponse = await dualAgent.processMessage(userMessage.content);
+        // ✅ 新增：创建 AbortController 并注册活跃请求（会自动取消旧请求）
+        const abortController = new AbortController();
+        registerActiveRequest(sessionId, requestId, res, abortController, dualAgent);
         
         // 记录 Fast Agent 响应时间
-        const fastDuration = Date.now() - startTime;
-        console.log(`⚡ [${requestId}] Fast response in ${fastDuration}ms`);
+        let fastDuration = 0;
+        let fullResponse = '';
         
         if (stream) {
+            // =============== 真正的流式响应 ===============
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
             res.setHeader('X-Request-ID', requestId);
+            res.setHeader('X-Accel-Buffering', 'no'); // 禁用 Nginx 缓冲
             
-            // 流式发送 Fast Agent 的回复
-            const chunks = fastResponse.split(/(\s+)/);
-            for (const chunk of chunks) {
+            let isStreamEnded = false;
+            
+            const endStream = () => {
+                if (isStreamEnded) return;
+                isStreamEnded = true;
+                
                 res.write(`data: ${JSON.stringify({
                     id: requestId,
                     object: 'chat.completion.chunk',
                     created: timestamp,
                     model: LLM_MODEL,
-                    choices: [{ index: 0, finish_reason: null, delta: { content: chunk } }]
+                    choices: [{ index: 0, finish_reason: 'stop', delta: {} }]
                 })}\n\n`);
-                await new Promise(resolve => setTimeout(resolve, 10)); // 模拟流式
+                res.write('data: [DONE]\n\n');
+                res.end();
+                
+                // ✅ 新增：清除活跃请求
+                clearActiveRequest(sessionId);
+            };
+            
+            try {
+                // 处理消息 - 双 Agent 并行运行
+                // Fast Agent 返回文本响应，Tool Agent 在后台执行工具调用（响应被忽略）
+                fullResponse = await dualAgent.processMessage(userMessage.content, {
+                    stream: true,
+                    res: res,  // 传递 res 对象，用于 steer 时结束前一个响应
+                    signal: abortController.signal,  // ✅ 新增：传递取消信号
+                    onChunk: (chunk) => {
+                        // 实时推送每个 text_delta
+                        res.write(`data: ${JSON.stringify({
+                            id: requestId,
+                            object: 'chat.completion.chunk',
+                            created: timestamp,
+                            model: LLM_MODEL,
+                            choices: [{ index: 0, finish_reason: null, delta: { content: chunk } }]
+                        })}\n\n`);
+                    }
+                });
+                
+                fastDuration = Date.now() - startTime;
+                console.log(`⚡ Streaming response completed in ${fastDuration}ms`);
+                
+                endStream();
+                
+            } catch (error) {
+                // ✅ 新增：检查是否是取消导致的错误
+                if (error.name === 'AbortError' || error.message.includes('cancelled') || error.message.includes('aborted')) {
+                    console.log(`⏹️  Request cancelled by new request for session: ${sessionId}`);
+                    // 不需要发送错误，cancelActiveRequest 已经处理了
+                    return;
+                }
+                
+                console.error(`❌ Streaming error:`, error.message);
+                if (!isStreamEnded) {
+                    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+                    endStream();
+                }
             }
             
-            res.write(`data: ${JSON.stringify({
-                id: requestId,
-                object: 'chat.completion.chunk',
-                created: timestamp,
-                model: LLM_MODEL,
-                choices: [{ index: 0, finish_reason: 'stop', delta: {} }]
-            })}\n\n`);
-            res.write('data: [DONE]\n\n');
-            res.end();
-            
         } else {
-            // 非流式响应 - 直接返回 Fast Agent 的回复
-            res.json({
-                id: requestId,
-                object: 'chat.completion',
-                created: timestamp,
-                model: LLM_MODEL,
-                choices: [{
-                    index: 0,
-                    finish_reason: 'stop',
-                    message: { role: 'assistant', content: fastResponse }
-                }],
-                metadata: {
-                    fastResponseMs: fastDuration,
-                    toolAgentRunning: true  // Tool Agent 在后台执行工具调用
+            // =============== 非流式响应 ===============
+            try {
+                fullResponse = await dualAgent.processMessage(userMessage.content, {
+                    signal: abortController.signal  // ✅ 新增：传递取消信号
+                });
+                fastDuration = Date.now() - startTime;
+                console.log(`⚡ Fast response in ${fastDuration}ms`);
+                
+                // ✅ 新增：清除活跃请求
+                clearActiveRequest(sessionId);
+                
+                res.json({
+                    id: requestId,
+                    object: 'chat.completion',
+                    created: timestamp,
+                    model: LLM_MODEL,
+                    choices: [{
+                        index: 0,
+                        finish_reason: 'stop',
+                        message: { role: 'assistant', content: fullResponse }
+                    }],
+                    metadata: {
+                        fastResponseMs: fastDuration,
+                        toolAgentRunning: true
+                    }
+                });
+            } catch (error) {
+                // ✅ 检查是否是取消导致的错误
+                if (error.name === 'AbortError' || error.message.includes('cancelled') || error.message.includes('aborted')) {
+                    console.log(`⏹️  Request cancelled by new request for session: ${sessionId}`);
+                    return;
                 }
-            });
+                throw error;  // 重新抛出其他错误
+            }
         }
         
-    } catch (error) {
-        const duration = Date.now() - startTime;
-        console.error(`❌ [${requestId}] Chat API error after ${duration}ms:`, error.message);
-        console.error(`   Stack:`, error.stack);
-        
-        if (stream) {
-            res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-            res.write('data: [DONE]\n\n');
-            res.end();
-        } else {
-            res.status(500).json({ error: error.message });
+        } catch (error) {
+            const duration = Date.now() - startTime;
+            console.error(`❌ Chat API error after ${duration}ms:`, error.message);
+            console.error(`   Stack:`, error.stack);
+            
+            // ✅ 新增：清除活跃请求
+            clearActiveRequest(sessionId);
+            
+            if (stream) {
+                res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+                res.write('data: [DONE]\n\n');
+                res.end();
+            } else {
+                res.status(500).json({ error: error.message });
+            }
         }
-    }
+    });
 });
 
 // ==================== 认证接口 ====================
