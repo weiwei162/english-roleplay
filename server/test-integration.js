@@ -3,6 +3,7 @@
  * StartVoiceChat 前后端集成测试
  */
 
+import './logger.js'; // 统一日志时间戳
 import https from 'https';
 
 const BASE_URL = 'http://localhost:3000';

@@ -4,6 +4,7 @@
  * 基于官方 AccessToken.js 实现
  */
 
+import './logger.js'; // 统一日志时间戳
 import { AccessToken, Parse, privileges } from './AccessToken.js';
 
 /**

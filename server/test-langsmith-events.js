@@ -8,6 +8,7 @@
  * node test-langsmith-events.js
  */
 
+import './logger.js'; // 统一日志时间戳
 import { Agent } from '@mariozechner/pi-agent-core';
 import { getModel } from '@mariozechner/pi-ai';
 import { attachLangSmithTracing, isLangSmithAvailable } from './langsmith-trace.js';

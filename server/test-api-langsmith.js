@@ -3,6 +3,7 @@
  * 测试 /v1/chat/completions API 的 LangSmith 追踪
  */
 
+import './logger.js'; // 统一日志时间戳
 import fetch from 'node-fetch';
 
 const API_URL = 'http://localhost:3000/v1/chat/completions?session_id=room_test_session_123';

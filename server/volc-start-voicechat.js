@@ -9,6 +9,7 @@
  * 3. 第三方 LLM 模式：CustomLLM（如 pi-agent-core）
  */
 
+import './logger.js'; // 统一日志时间戳
 import crypto from 'crypto';
 import https from 'https';
 
